@@ -80,6 +80,16 @@ def verify_run(directory, manifest, method, seed):
 
 def summarize(output):
     output = Path(output)
+    atomic_json(output / "status.json", {"status": "validating"})
+    try:
+        return _summarize(output)
+    except BaseException as exc:
+        atomic_json(output / "status.json", {"status": "failed", "error": str(exc)})
+        raise
+
+
+def _summarize(output):
+    output = Path(output)
     manifest = read_manifest(output / "manifest.json")
     results = [verify_run(output / f"{method}-{seed}", manifest, method, seed)
                for seed in manifest["config"]["seeds"] for method in METHODS]
@@ -143,6 +153,18 @@ def resolve(config):
 
 
 def matrix(args):
+    import fcntl
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    with (output / ".matrix.lock").open("w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError("Another matrix process owns this output directory") from None
+        return _matrix(args)
+
+
+def _matrix(args):
     c = json.loads(Path(args.config).read_text())
     validate_config(c)
     output = Path(args.output)

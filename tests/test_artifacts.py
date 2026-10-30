@@ -62,6 +62,7 @@ def test_six_run_summary_and_censoring(tmp_path, manifest):
     (tmp_path / "simplex-17/adapter/adapter_model.safetensors").unlink()
     with pytest.raises(OSError):
         summarize(tmp_path)
+    assert json.loads((tmp_path / "status.json").read_text())["status"] == "failed"
 
 
 @pytest.mark.parametrize("mutation", ["checksum", "steps", "rank_budget", "seed", "missing_head"])
