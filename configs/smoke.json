@@ -1,0 +1,41 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B",
+  "model_revision": "main",
+  "dataset": "fancyzhx/ag_news",
+  "dataset_revision": "main",
+  "dataset_config": null,
+  "train_split": "train",
+  "test_split": "test",
+  "text_column": "text",
+  "label_column": "label",
+  "num_labels": 4,
+  "train_samples": 64,
+  "validation_samples": 16,
+  "test_samples": 16,
+  "data_seed": 20261030,
+  "seeds": [
+    17,
+    42,
+    123
+  ],
+  "bits": 8,
+  "rank": 8,
+  "alpha": 16,
+  "target_modules": [
+    "q_proj"
+  ],
+  "batch_size": 2,
+  "max_length": 32,
+  "steps": 8,
+  "eval_every": 2,
+  "target_f1": 0.85,
+  "lr": 0.0002,
+  "weight_decay": 0.01,
+  "warmup_steps": 1,
+  "rank_interval": 2,
+  "rank_updates": 2,
+  "weight_lr": 0.1,
+  "regularization": 0.01,
+  "timing_warmup_steps": 1,
+  "gradient_spike_norm": 100.0
+}
