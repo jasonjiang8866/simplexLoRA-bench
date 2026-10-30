@@ -1,0 +1,39 @@
+name: Benchmark checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  cpu:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install ".[test]"
+      - run: pip check
+      - run: pytest -q -m "not cuda"
+      - run: python -m simplexbench.compat --output compatibility-cpu.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpu-compatibility-${{ matrix.python }}
+          path: compatibility-cpu.json
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: runpod/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
