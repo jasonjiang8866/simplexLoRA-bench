@@ -1,5 +1,9 @@
 # Validation record
 
+## Gradient diagnosis — 2026-11-02 SGT
+
+[Six 50-step GPU runs and CPU cross-region restoration passed](results/gradient-diagnosis-41331245400.md). All 300 steps passed analytic head-gradient, padding/loss, clipping and optimizer checks; both Pods were deleted. Large norms and near-unit importance weights remain reported limitations, not suppressed flags. Full 500-step performance results are pending.
+
 ## Gradient diagnosis preparation — 2026-11-02 SGT
 
 See [preflight evidence](results/gradient-diagnosis-preflight.md). New probes,

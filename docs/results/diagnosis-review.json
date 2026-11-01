@@ -1,0 +1,28 @@
+{
+  "decision": "proceed",
+  "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:2d630d23e069ed5b486520dbd303c3c35a7cc8c56ec79d269c710819adf7fa08",
+  "source_hash": "2f1b91c4b02e5d0b937edfd962ef941cb6f1f1497cf3470eba93d4be971734b9",
+  "diagnostic_run": 41331245400,
+  "diagnostic_artifact_sha256": "a1a63458e261648545479fd96097e0f6b5c7975ca0a9ebd63104df0e61f40b87",
+  "checks": {
+    "six_runs": true,
+    "paired_batches_and_initial_heads": true,
+    "finite_present_gradients": true,
+    "clipping_verified": true,
+    "analytic_head_gradient_verified": true
+  },
+  "rationale": "Head dominates squared gradient norm; analytic mean-CE gradient verified, pooling/padding and optimizer invariants pass, no nonfinite/missing gradients, clipping works, paired data and initialization match. Preserve all training settings and flags. Compare this specified configuration without claiming clipping/search hyperparameters are optimal.",
+  "authorized_session_budget_usd": 10,
+  "formal_plan": {
+    "worker_seconds": 2051.0441583232023,
+    "gpu_seconds_with_same_startup": 2194.0073255477473,
+    "gpu_deadline_minutes": 75,
+    "max_compute_usd": 1,
+    "session_budget_usd": 10,
+    "worst_case_compute_usd": 0.9866666666666666,
+    "basis": "worker_seconds + 9 * sum(50-step train_wall_seconds); same test/setup/export and startup overhead; estimate, not guarantee"
+  },
+  "limitations": [
+    "Importance weights remain within about 1.1e-5 of one; floor rank allocation is boundary-sensitive under joint clipping. Preserve this configuration; do not generalize to tuned SimplexLoRA or paper reproduction."
+  ]
+}

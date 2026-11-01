@@ -7,7 +7,7 @@ three paired seeds and a RunPod launch path.
 This is an engineering experiment, not a reproduction of the paper's reported
 scores. The [RunPod smoke record](docs/results/runpod-smoke-41324992190.md)
 contains real CUDA/int8 checks and six eight-step runs; the full performance
-benchmark remains pending. Smoke metrics do not establish either method's
+benchmark remains pending. The [50-step gradient diagnosis](docs/results/gradient-diagnosis-41331245400.md) passed with the original training settings; large norms are dominated by the classifier head. Smoke metrics do not establish either method's
 accuracy or speed advantage. The implementation uses stock PEFT; it does not install the
 authors' modified PEFT fork.
 
