@@ -105,7 +105,8 @@ def cleanup(api):
 
 
 def download(url, token, descriptor, path):
-    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token})
+    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token,
+                                             "User-Agent": "simplexlora-bench-actions/0.1"})
     count, h = 0, hashlib.sha256()
     with urllib.request.build_opener(NoRedirect).open(req, timeout=60) as src, path.open("wb") as dst:
         while chunk := src.read(1024**2):

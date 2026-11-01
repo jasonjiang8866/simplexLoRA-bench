@@ -21,7 +21,8 @@ def main():
         token = detail.get('env', {}).get('SIMPLEX_RESULT_TOKEN')
         if token:
             req = urllib.request.Request(f"https://{pod['id']}-8888.proxy.runpod.net/result",
-                                         headers={'Authorization': 'Bearer ' + token})
+                                         headers={'Authorization': 'Bearer ' + token,
+                                                  'User-Agent': 'simplexlora-bench-actions/0.1'})
             try:
                 with urllib.request.build_opener(NoRedirect).open(req, timeout=10) as response:
                     result = json.loads(response.read(2_000_001))

@@ -23,7 +23,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def request(url, *, token, method="GET", body=None, limit=8_000_000):
     req = urllib.request.Request(url, method=method,
-        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                 "User-Agent": "simplexlora-bench-actions/0.1"},
         data=json.dumps(body).encode() if body is not None else None)
     try:
         with urllib.request.build_opener(NoRedirect).open(req, timeout=30) as response:
