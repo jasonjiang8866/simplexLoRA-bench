@@ -26,7 +26,11 @@ def report(archive):
                 raise ValueError('Invalid evidence member')
             return tar.extractfile(item).read()
         manifest = json.loads(read('manifest.json'))
+        encoded = json.dumps({k:v for k,v in manifest.items() if k != 'id'}, sort_keys=True, allow_nan=False).encode()
+        if hashlib.sha256(encoded).hexdigest() != manifest['id']:
+            raise ValueError('Manifest checksum mismatch')
         summary = json.loads(read('summary.json'))
+        compatibility = json.loads(read('compatibility.json'))
         expected = manifest['config']['steps']
         steps, provenance, runs = {}, {}, []
         for result in summary['runs']:
@@ -36,6 +40,14 @@ def report(archive):
                 raise ValueError('Incomplete step sequence')
             steps[key] = rows
             provenance[key] = json.loads(read(key + '/provenance.json'))
+            status = json.loads(read(key + '/status.json'))
+            if status['status'] != 'passed' or status['manifest_id'] != manifest['id']:
+                raise ValueError('Unsealed or mismatched run')
+            for relative, expected_hash in status['artifacts'].items():
+                if hashlib.sha256(read(key + '/' + relative)).hexdigest() != expected_hash:
+                    raise ValueError('Artifact checksum mismatch: ' + key + '/' + relative)
+            if json.loads(read(key + '/result.json')) != result:
+                raise ValueError('Summary differs from sealed run result')
             grads = [r['gradients'] for r in rows]
             obs = [r['observations'] for r in rows]
             fractions = [g['group_norms']['head']**2 / g['norm']**2 for g in grads if g['norm']]
@@ -63,7 +75,9 @@ def report(archive):
                     'adapter_parameters': r['adapter_parameters'], 'budget': r['budget']}
                     for r in ranks],
                 'evaluations': json.loads(read(key + '/evaluations.json')),
-                'head_initial': provenance[key]['head_initial']})
+                'head_initial': provenance[key]['head_initial'],
+                'provenance': provenance[key],
+                'rank_history': ranks})
         paired = []
         for seed in (17, 42, 123):
             a, b = [steps[f'{m}-{seed}'] for m in ('lora', 'simplex')]
@@ -75,6 +89,8 @@ def report(archive):
                 'initial_loss_delta': b[0]['loss'] - a[0]['loss'],
                 'initial_norm_delta': b[0]['gradients']['norm'] - a[0]['gradients']['norm']})
         checks = {
+            'sealed_run_artifacts_verified': True,
+            'cuda_int8_gate_passed': compatibility['status'] == 'passed' and compatibility['device'] == 'cuda' and compatibility['bits'] == 8,
             'six_runs': len(runs) == 6 and {(r['method'],r['seed']) for r in runs} == {(m,s) for m in ('lora','simplex') for s in (17,42,123)},
             'paired_batches_and_initial_heads': all(p['all_batch_hashes_equal'] and p['initial_head_hash_equal'] for p in paired),
             'finite_present_gradients': all(r['gradient_summary']['missing_steps'] == r['gradient_summary']['nonfinite_steps'] == 0 for r in runs),
@@ -82,7 +98,8 @@ def report(archive):
             'analytic_head_gradient_verified': all(r['observations']['head_gradient_relative_error_max'] <= 1e-4 for r in runs)}
         deltas = [x['test_f1_delta_simplex_minus_lora'] for x in summary['paired']]
         return {'archive_sha256': hashlib.file_digest(Path(archive).open('rb'), 'sha256').hexdigest(),
-                'manifest': manifest, 'checks': checks, 'runs': runs, 'paired_checks': paired,
+                'manifest': manifest, 'compatibility': compatibility,
+                'checks': checks, 'runs': runs, 'paired_checks': paired,
                 'aggregates': summary['aggregates'], 'paired_f1': summary['paired'],
                 'paired_f1_delta_summary': describe(deltas)}
 
