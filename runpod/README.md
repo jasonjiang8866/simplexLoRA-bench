@@ -200,3 +200,59 @@ the Actions smoke controller described above does remove its own test Pods.
 Restarting with the same run ID verifies hashes and skips completed runs.
 Incomplete attempts are archived and restarted from zero. A changed image/source
 or config must use a new run ID. Do not run concurrent Pods against the same ID.
+
+## Gradient diagnosis and full-matrix Actions (new)
+
+`RunPod gradient diagnosis and full benchmark` accepts an immutable image digest
+and its exact source commit. It checks out that commit and verifies both the
+baked `/opt/source-sha.txt` and the training source hash on the GPU and CPU.
+Publish the changed image first; the historical digest above has no new probes.
+
+Dispatch without `confirm_paid_experiment` first: this only checks inventory,
+current MIG/CPU rates, the exact Global Volume ID, budget headroom, and writes
+`plan.json`. No paid creation occurs. The GPU remains the specified PRO 6000
+Blackwell MIG 24GB with a $0.69/hour ceiling; there is no fallback GPU.
+
+The `diagnostic` profile is the first 50 optimizer steps of the 500-step schedule,
+with the **full** 8192/1024/2048 data subsets, batch 8 and length 128. It uses all
+three paired seeds, includes rank changes at 10/20/30 and evaluations at 25/50.
+Both diagnostic and benchmark pin the model/data revisions used by the old
+smoke. No learning rate, initialization, loss, clipping or spike threshold is
+changed. Group norms, analytic head-gradient agreement, pooling/padding checks,
+batch hashes, post-clip norms, logits, hidden norms and optimizer/rank transitions
+are recorded in each step. Monitoring is charged to both methods' timing.
+
+The full profile requires all six **500-step** runs; it cannot pass with smoke
+results. Maximum result export is 1 GiB (512 MiB file payload plus archive
+headroom), versus the historical smoke's 256 MiB. CPU restoration retains a
+10 GB writable disk and a 15-minute deadline. GitHub experiment artifacts are
+kept for 90 days; completion markers and per-file SHA-256 remain on Global
+Volume, written after the archive. Training/cache remain local `/workspace`.
+
+Supply an explicit `gpu_minutes` and `max_compute_usd`. The cap must cover GPU
+time plus five minutes cleanup reserve, and CPU 15m plus five minutes cleanup
+reserve. Example: diagnosis 45m requires $0.6417 at rate ceilings; the proposed
+$0.65 limit is **not** a full-benchmark authorization. The cap is checked against
+account balance and $500 monthly headroom, not substituted with the old $1
+reserve. Storage/request charges remain separate. Provider or runner outages
+can delay deletion beyond the reserved cleanup window; this is a controller
+deadline, not a provider-guaranteed billing cutoff.
+
+After reviewing diagnostic evidence, commit `docs/results/diagnosis-review.json`
+with `decision`, `image`, `source_hash`, `diagnostic_run`, and a rationale. Its
+workflow publishes `diagnosis-review`. A formal dispatch requires the artifact's
+run ID and matching image/source. CPU-only recovery uses `restore_from_run` and
+the original profile inputs; it verifies the prior GPU archive and confirmed
+cleanup, and creates no replacement GPU. This recovers a **completed matrix**;
+partial-matrix cross-Pod resume is not implemented. The CLI's local resume does
+not imply that incomplete local Pod data survives deletion.
+
+Analyze downloaded step evidence with:
+
+```bash
+python runpod/analyze_gradients.py smoke-evidence.tar --output gradients.json
+```
+
+The archive retains the historical filename `smoke-evidence.tar` because it
+reuses the verified transport; `plan.json`, acceptance `performance_benchmark`,
+resolved config and each run's step count distinguish the actual experiment.

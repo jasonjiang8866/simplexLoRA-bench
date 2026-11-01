@@ -12,7 +12,9 @@ PHASES = {'starting', 'global-volume-write-read', 'cuda-gate-and-six-smoke-worke
 
 def main():
     api = Runpod()
-    for pod in api.listing('/pods', 'pods'):
+    pods = api.listing('/pods', 'pods')
+    print(json.dumps({'managed_pod_count': sum(p.get('env', {}).get('SIMPLEX_MANAGED_BY') == REPOSITORY for p in pods)}))
+    for pod in pods:
         if pod.get('env', {}).get('SIMPLEX_MANAGED_BY') != REPOSITORY:
             continue
         detail = api.call('/pods/' + pod['id'])

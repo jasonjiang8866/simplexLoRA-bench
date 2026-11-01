@@ -21,6 +21,7 @@ jobs:
           context: .
           file: runpod/Dockerfile
           push: true
+          build-args: SOURCE_SHA=${{ github.sha }}
           tags: ghcr.io/jasonjiang8866/simplexlora-bench:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

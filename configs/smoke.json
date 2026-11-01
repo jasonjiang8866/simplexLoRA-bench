@@ -1,8 +1,8 @@
 {
   "model": "Qwen/Qwen2.5-0.5B",
-  "model_revision": "main",
+  "model_revision": "060db6499f32faf8b98477b0a26969ef7d8b9987",
   "dataset": "fancyzhx/ag_news",
-  "dataset_revision": "main",
+  "dataset_revision": "eb185aade064a813bc0b7f42de02595523103ca4",
   "dataset_config": null,
   "train_split": "train",
   "test_split": "test",

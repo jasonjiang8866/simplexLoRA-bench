@@ -1,0 +1,19 @@
+name: Publish reviewed gradient decision
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['docs/results/diagnosis-review.json']
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diagnosis-review
+          path: docs/results/diagnosis-review.json
+          if-no-files-found: error
+          retention-days: 90

@@ -32,15 +32,18 @@ def save(name, value):
     temp.replace(path)
 
 
-def validate_result(result, phase, meta):
+def validate_result(result, phase, meta, profile=None):
+    profile = profile or {"mode": "smoke", "steps": 8, "image": IMAGE, "source": SOURCE, "max_bytes": 256 * 1024**2}
     r = result.get("report", {})
     if result.get("status") != "passed":
         raise ValueError("Worker did not pass; see result artifact")
-    expected = {"image": IMAGE, "source_hash": SOURCE, "mode": phase,
+    expected = {"image": profile["image"], "source_hash": profile["source"], "mode": phase,
                 "run_id": meta["run_id"], "global_volume_id": meta["volume_id"],
                 "pod_id": meta["pod_id"], "controller_sha": meta["controller_sha"]}
     if any(r.get(k) != v for k, v in expected.items()):
         raise ValueError("Worker identity mismatch")
+    if "image_source_sha" in profile and r.get("image_source_sha") != profile["image_source_sha"]:
+        raise ValueError("Image commit evidence mismatch")
     gate = r.get("compatibility", {})
     if (gate.get("status"), gate.get("device"), gate.get("bits")) != ("passed", "cuda", 8):
         raise ValueError("Missing CUDA/int8 evidence")
@@ -53,7 +56,7 @@ def validate_result(result, phase, meta):
             (m, s) for m in ("lora", "simplex") for s in (17, 42, 123)}:
         raise ValueError("Incomplete matrix")
     for run in runs:
-        if run.get("status") != "passed" or run.get("steps") != 8 or run.get("quantized_linear_count", 0) <= 0:
+        if run.get("status") != "passed" or run.get("steps") != profile["steps"] or run.get("quantized_linear_count", 0) <= 0:
             raise ValueError("Invalid smoke run")
         for key in ("test_macro_f1", "validation_macro_f1"):
             if not finite(run.get(key)) or run[key] > 1:
@@ -66,7 +69,7 @@ def validate_result(result, phase, meta):
     if not re.fullmatch(r"[a-f0-9]{64}", r.get("snapshot_sha256", "")) or r.get("file_count", 0) < 48:
         raise ValueError("Missing persisted result evidence")
     bundle = r.get("bundle", {})
-    if not isinstance(bundle.get("bytes"), int) or not 0 < bundle["bytes"] <= 256 * 1024**2 or not re.fullmatch(r"[a-f0-9]{64}", bundle.get("sha256", "")):
+    if not isinstance(bundle.get("bytes"), int) or not 0 < bundle["bytes"] <= profile["max_bytes"] or not re.fullmatch(r"[a-f0-9]{64}", bundle.get("sha256", "")):
         raise ValueError("Invalid archive descriptor")
     if phase == "restore" and (r.get("restored_checksums_verified") is not True or
                                r.get("summary_revalidated") is not True or
@@ -126,10 +129,12 @@ def download(url, token, descriptor, path):
         raise ValueError("Downloaded result archive checksum mismatch")
 
 
-def launch_phase(api, config, phase, *, prior=None):
+def launch_phase(api, config, phase, *, prior=None, profile=None):
+    profile = profile or {"mode": "smoke", "steps": 8, "image": IMAGE, "source": SOURCE,
+                          "gpu_seconds": 2700, "max_bytes": 256 * 1024**2}
     owner_run_id = "simplex-" + identity()
     run_id = prior["run_id"] if phase == "restore" else owner_run_id
-    sha = os.environ["GITHUB_SHA"]
+    sha = os.environ.get("CONTROLLER_SHA", os.environ["GITHUB_SHA"])
     if not re.fullmatch(r"[a-f0-9]{40}", sha):
         raise RuntimeError("Invalid controller SHA")
     name = owner_run_id + "-" + phase
@@ -139,22 +144,26 @@ def launch_phase(api, config, phase, *, prior=None):
     code = "import base64;exec(compile(base64.b64decode(" + repr(base64.b64encode(worker).decode()) + "),'/tmp/simplex-worker.py','exec'))"
     meta = {"name": name, "run_id": run_id, "phase": phase, "controller_sha": sha,
             "owner_run_id": owner_run_id,
-            "volume_id": config["global_volume"]["id"], "image": IMAGE,
+            "volume_id": config["global_volume"]["id"], "image": profile["image"],
+            "profile": profile,
             "worker_sha256": hashlib.sha256(worker).hexdigest(), "started_epoch": time.time()}
-    body = {"name": name, "image": IMAGE, "cloud": "SECURE", "disk": 40,
+    body = {"name": name, "image": profile["image"], "cloud": "SECURE", "disk": 40,
             "mounts": {"global": [{"volumeId": meta["volume_id"], "path": "/global"}]},
             "startSsh": False, "ports": ["8888/http"],
             "entrypoint": ["/bin/bash", "-lc"], "cmd": ["exec /opt/bench-venv/bin/python -u -c " + shlex.quote(code)],
             "env": {"SIMPLEX_MANAGED_BY": REPOSITORY, "SIMPLEX_RESULT_TOKEN": token,
-                    "SIMPLEX_PHASE": phase, "SIMPLEX_IMAGE": IMAGE, "SIMPLEX_SOURCE_HASH": SOURCE,
+                    "SIMPLEX_PHASE": phase, "SIMPLEX_IMAGE": profile["image"], "SIMPLEX_SOURCE_HASH": profile["source"],
                     "SIMPLEX_GLOBAL_VOLUME_ID": meta["volume_id"], "SIMPLEX_CONTROLLER_SHA": sha,
-                    "BENCH_MODE": "smoke", "BENCH_RUN_ID": run_id, "BENCH_TIMEOUT_SECONDS": "2300",
+                    "BENCH_MODE": profile["mode"], "BENCH_RUN_ID": run_id,
+                    "BENCH_TIMEOUT_SECONDS": str(profile["gpu_seconds"] - 400),
+                    "SIMPLEX_MAX_BYTES": str(profile["max_bytes"]),
+                    "SIMPLEX_IMAGE_SOURCE_SHA": profile.get("image_source_sha", ""),
                     "HF_HOME": "/workspace/huggingface", "PYTHONUNBUFFERED": "1"}}
     if phase == "smoke":
         body.update(gpu={"id": MIG, "count": 1, "minRamPerGpu": 16,
                          "minVcpuCountPerGpu": 4, "minCudaVersion": "12.8"},
                     dataCenterIds=config["gpu"]["regions"])
-        cap, deadline = .69, time.time() + 2700
+        cap, deadline = .69, time.time() + profile["gpu_seconds"]
     else:
         cpu = cpu_placement(api, exclude=prior["data_center"])
         # Small CPU flavors reject the GPU's 40 GB writable disk request.
@@ -204,7 +213,7 @@ def launch_phase(api, config, phase, *, prior=None):
                 print("Worker phase: " + str(last), flush=True)
             if result.get("status") in {"passed", "failed"}:
                 save("result-" + phase + ".json", result)
-                validate_result(result, phase, meta)
+                validate_result(result, phase, meta, profile)
                 if phase == "smoke":
                     download(url + "/archive", token, result["report"]["bundle"], OUTPUT / "smoke-evidence.tar")
                 else:

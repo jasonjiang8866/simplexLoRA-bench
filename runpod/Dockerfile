@@ -2,6 +2,8 @@ FROM pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime
 ENV PYTHONUNBUFFERED=1 HF_HOME=/workspace/huggingface TOKENIZERS_PARALLELISM=false
 WORKDIR /opt/bench
 COPY . .
+ARG SOURCE_SHA=unknown
+RUN printf '%s\n' "$SOURCE_SHA" > /opt/source-sha.txt
 RUN python -m venv --system-site-packages /opt/bench-venv && \
     /opt/bench-venv/bin/pip install --no-cache-dir ".[gpu,test]" && \
     /opt/bench-venv/bin/python -m pip check && \

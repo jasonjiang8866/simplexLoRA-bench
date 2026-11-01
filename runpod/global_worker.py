@@ -22,7 +22,8 @@ RESULT = {"status": "running", "phase": "starting"}
 TOKEN = os.environ.get("SIMPLEX_RESULT_TOKEN", "")
 LOCAL = Path("/workspace")
 ARCHIVE = LOCAL / "evidence.tar"
-MAX_BYTES = 256 * 1024**2
+MAX_BYTES = int(os.environ.get("SIMPLEX_MAX_BYTES", 256 * 1024**2))
+MODE = os.environ.get("BENCH_MODE", "smoke")
 
 
 def sha(path):
@@ -97,8 +98,12 @@ def validate_tree(root):
     if {(r["method"], r["seed"]) for r in summary["runs"]} != {
             (m, s) for m in ("lora", "simplex") for s in (17, 42, 123)} or len(summary["runs"]) != 6:
         raise ValueError("Incomplete paired matrix")
-    if any(r["steps"] != 8 for r in summary["runs"]):
-        raise ValueError("Not the smoke profile")
+    expected = json.loads((Path("/opt/bench/configs") / (MODE + ".json")).read_text())
+    manifest = json.loads((root / "manifest.json").read_text())
+    if MODE != "smoke" and (manifest["config"] != expected or manifest["requested_config"] != expected):
+        raise ValueError("Unexpected experiment configuration")
+    if any(r["steps"] != expected["steps"] for r in summary["runs"]):
+        raise ValueError("Incomplete experiment profile")
     return gate, summary
 
 
@@ -121,7 +126,7 @@ def train(target, root, report):
     report["probe"] = {**spec(probe), "write_and_readback_seconds": time.monotonic() - before}
     RESULT["phase"] = "cuda-gate-and-six-smoke-workers"
     # Run the image's original entrypoint, preserving gate-before-workers ordering.
-    run(["/bin/bash", "/opt/bench/runpod/start.sh"], LOCAL / "harness.log", 2400)
+    run(["/bin/bash", "/opt/bench/runpod/start.sh"], LOCAL / "harness.log", int(os.environ.get("BENCH_TIMEOUT_SECONDS", "2300")) + 40)
     report["compatibility"], report["summary"] = validate_tree(root)
     RESULT["phase"] = "publish-completed-results"
     files = {str(p.relative_to(root)): spec(p) for p in sorted(root.rglob("*")) if p.is_file()}
@@ -171,10 +176,15 @@ def work():
     os.environ["PATH"] = "/opt/bench-venv/bin:" + os.environ.get("PATH", "")
     report = {"mode": os.environ["SIMPLEX_PHASE"], "image": os.environ["SIMPLEX_IMAGE"],
               "run_id": os.environ["BENCH_RUN_ID"], "global_volume_id": os.environ["SIMPLEX_GLOBAL_VOLUME_ID"],
-              "pod_id": os.environ["RUNPOD_POD_ID"], "controller_sha": os.environ["SIMPLEX_CONTROLLER_SHA"]}
+              "pod_id": os.environ["RUNPOD_POD_ID"], "profile": MODE, "controller_sha": os.environ["SIMPLEX_CONTROLLER_SHA"]}
     started = time.monotonic()
     try:
         LOCAL.mkdir(exist_ok=True)
+        expected_sha = os.environ.get("SIMPLEX_IMAGE_SOURCE_SHA")
+        if expected_sha:
+            report["image_source_sha"] = Path("/opt/source-sha.txt").read_text().strip()
+            if report["image_source_sha"] != expected_sha:
+                raise ValueError("Baked image source commit mismatch")
         if not os.path.ismount("/global") or os.path.islink("/global"):
             raise ValueError("Global Volume is not mounted")
         sys.path.insert(0, "/opt/bench")
