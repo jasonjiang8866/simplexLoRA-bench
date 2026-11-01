@@ -1,0 +1,54 @@
+name: RunPod smoke and Global Volume
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_paid_smoke:
+        description: 'MIG 24GB <=$0.69/h for 45m, CPU <=$0.20/h for 15m; $1 reserve; existing Global Volume only'
+        type: boolean
+        default: false
+        required: true
+  push:
+    branches: [main]
+    paths: ['runpod/provider.py', 'runpod/global_smoke.py', 'runpod/global_worker.py', '.github/workflows/runpod-smoke.yml']
+permissions:
+  contents: read
+concurrency:
+  group: simplex-runpod-smoke
+  cancel-in-progress: false
+jobs:
+  smoke:
+    if: github.repository == 'jasonjiang8866/simplexLoRA-bench'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Lifecycle and evidence regressions before renting compute
+        run: python -m unittest discover -s runpod -p 'test_*.py' -v
+      - name: Read-only preflight (push or unconfirmed dispatch)
+        if: github.event_name != 'workflow_dispatch' || !inputs.confirm_paid_smoke
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: python runpod/global_smoke.py preflight
+      - name: GPU smoke and fresh CPU cross-region restore
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_smoke
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          CONFIRM_PAID_SMOKE: ${{ inputs.confirm_paid_smoke }}
+        run: python runpod/global_smoke.py smoke
+      - name: Always release only this attempt's compute
+        if: always()
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: python runpod/global_smoke.py cleanup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simplex-runpod-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runpod-results/
+          retention-days: 14
+          if-no-files-found: error

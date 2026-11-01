@@ -77,6 +77,40 @@ from the container's user environment while reusing its PyTorch installation.
 
 ## 2. Start on RunPod
 
+### Actions: smoke and Global Volume persistence
+
+`RunPod smoke and Global Volume` uses the repository's `RUNPOD_API_KEY` Actions
+secret. Pushes run a read-only preflight; manually dispatch with
+`confirm_paid_smoke=true` to rent compute. It uses the published digest above,
+without replacing the benchmark code or installing packages in the Pod.
+
+The controller requires the existing Global Volume named
+`spt-1436489970-step90-inputs-v1`; it creates no storage. One PRO 6000 Blackwell
+MIG 1g.24gb runs the original smoke entrypoint, then a separate CPU Pod in a
+different data center restores and verifies the completed results. The mount
+is `/global`; this project's new data lives under
+`/global/simplexlora-bench/simplex-<Actions run>-<attempt>/`.
+Training and the Hugging Face cache stay on local `/workspace` because Global
+Volume object storage must not be assumed to support POSIX locks or atomic
+rename. Completed results are published as `evidence.tar` with file hashes,
+an 8 MiB access probe, and a completion marker written last. The CPU reader
+verifies every file and regenerates the summary from restored artifacts.
+
+The GPU rate cap is $0.69/hour for at most 45 minutes, followed by a CPU rate
+cap of $0.20/hour for at most 15 minutes. Preflight checks a $1 reserve and
+headroom under the $500 monthly budget. Storage/request charges are additional.
+The account credential remains on the Actions runner; only an ephemeral result
+token reaches the Pod. The controller cleans up compute in `finally`, with a
+second `always()` cleanup step, and checks that the Pods disappeared. A hard
+runner failure can still require manual cleanup; container exit alone does not
+stop billing. Global Volume contents and unrelated Pods are retained.
+
+Download the `simplex-runpod-<run>-<attempt>` artifact for preflight, provision,
+result, cleanup and acceptance evidence. A passed preflight is not a smoke
+result; a smoke result is not the full performance benchmark.
+
+### Console or regional-volume launcher
+
 Choose a single CUDA GPU, attach an existing network volume at `/workspace`
 and select the image digest. Set:
 
