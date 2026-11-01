@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import secrets
 import shlex
+import shutil
 import signal
 import time
 import urllib.request
@@ -78,7 +79,7 @@ def cleanup(api):
     identity()
     for path in sorted(OUTPUT.glob("provision-*.json")):
         meta = json.loads(path.read_text())
-        if meta["run_id"] != "simplex-" + identity():
+        if meta.get("owner_run_id", meta["run_id"]) != "simplex-" + identity():
             raise RuntimeError("Cleanup identity mismatch")
         matches = [p for p in api.listing("/pods", "pods") if p.get("name") == meta["name"]]
         if len(matches) > 1:
@@ -126,16 +127,18 @@ def download(url, token, descriptor, path):
 
 
 def launch_phase(api, config, phase, *, prior=None):
-    run_id = "simplex-" + identity()
+    owner_run_id = "simplex-" + identity()
+    run_id = prior["run_id"] if phase == "restore" else owner_run_id
     sha = os.environ["GITHUB_SHA"]
     if not re.fullmatch(r"[a-f0-9]{40}", sha):
         raise RuntimeError("Invalid controller SHA")
-    name = run_id + "-" + phase
+    name = owner_run_id + "-" + phase
     token = secrets.token_urlsafe(32)
     print("::add-mask::" + token, flush=True)
     worker = (Path(__file__).with_name("global_worker.py")).read_bytes()
     code = "import base64;exec(compile(base64.b64decode(" + repr(base64.b64encode(worker).decode()) + "),'/tmp/simplex-worker.py','exec'))"
     meta = {"name": name, "run_id": run_id, "phase": phase, "controller_sha": sha,
+            "owner_run_id": owner_run_id,
             "volume_id": config["global_volume"]["id"], "image": IMAGE,
             "worker_sha256": hashlib.sha256(worker).hexdigest(), "started_epoch": time.time()}
     body = {"name": name, "image": IMAGE, "cloud": "SECURE", "disk": 40,
@@ -157,6 +160,7 @@ def launch_phase(api, config, phase, *, prior=None):
         body.update(cpu={"id": cpu["id"], "vcpuCount": 2}, dataCenterIds=[cpu["region"]])
         body["env"]["SIMPLEX_SNAPSHOT_SHA256"] = prior["report"]["snapshot_sha256"]
         meta["writer_pod_id"] = prior["pod_id"]
+        meta["requested_cpu"] = cpu
         cap, deadline = .20, time.time() + 900
     save("provision-" + phase + ".json", meta)
 
@@ -216,20 +220,44 @@ def launch_phase(api, config, phase, *, prior=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["preflight", "smoke", "cleanup"])
+    parser.add_argument("mode", choices=["preflight", "smoke", "restore", "cleanup"])
     mode = parser.parse_args().mode
     api = Runpod()
     if mode == "cleanup":
         cleanup(api)
         return
-    config = preflight(api)
+    config = preflight(api, require_gpu=mode != "restore")
     save("preflight.json", config)
     print(json.dumps(config, indent=2), flush=True)
     if mode == "preflight":
         return
     if os.environ.get("GITHUB_REF") != "refs/heads/main" or os.environ.get("CONFIRM_PAID_SMOKE") != "true":
         raise ValueError("Paid smoke requires explicit main workflow dispatch")
-    first = launch_phase(api, config, "smoke")
+    if mode == "restore":
+        previous_run = os.environ.get("RESTORE_FROM_RUN", "")
+        if not re.fullmatch(r"[0-9]+", previous_run):
+            raise ValueError("Invalid prior Actions run")
+        previous = Path("restore-input")
+        meta = json.loads((previous / "provision-smoke.json").read_text())
+        result = json.loads((previous / "result-smoke.json").read_text())
+        if (meta.get("run_id") != "simplex-" + previous_run + "-1" or
+                meta.get("cleanup_confirmed") is not True or
+                meta.get("volume_id") != config["global_volume"]["id"]):
+            raise ValueError("Prior smoke ownership/cleanup/volume mismatch")
+        validate_result(result, "smoke", meta)
+        bundle = previous / "smoke-evidence.tar"
+        h = hashlib.sha256()
+        with bundle.open("rb") as stream:
+            while chunk := stream.read(1024**2):
+                h.update(chunk)
+        if {"bytes": bundle.stat().st_size, "sha256": h.hexdigest()} != result["report"]["bundle"]:
+            raise ValueError("Prior smoke export corrupted")
+        first = {**meta, "report": result["report"]}
+        shutil.copyfile(previous / "result-smoke.json", OUTPUT / "result-smoke.json")
+        shutil.copyfile(previous / "provision-smoke.json", OUTPUT / "source-smoke-provision.json")
+        print("Verified prior smoke artifact; renting CPU only", flush=True)
+    else:
+        first = launch_phase(api, config, "smoke")
     restored = launch_phase(api, config, "restore", prior=first)
     save("acceptance.json", {"status": "passed", "image": IMAGE, "source_hash": SOURCE,
         "run_id": first["run_id"], "global_volume_id": config["global_volume"]["id"],

@@ -33,8 +33,16 @@ def request(url, *, token, method="GET", body=None, limit=8_000_000):
             raise RuntimeError("Response exceeds limit")
         return json.loads(data) if data else None
     except urllib.error.HTTPError as exc:
-        # Provider bodies can echo input; never print them or request headers.
-        raise RuntimeError(f"Remote HTTP {exc.code}") from None
+        # Only fixed diagnostic categories leave this handler, never provider text.
+        raw = exc.read(16000).decode(errors="replace").lower()
+        categories = [label for word, label in (
+            ("capacity", "capacity"), ("stock", "capacity"), ("disk", "disk"),
+            ("cpu", "cpu"), ("vcpu", "vcpu"), ("image", "image"),
+            ("global", "global-volume"), ("mount", "mount"), ("port", "port"),
+            ("entrypoint", "entrypoint"), ("command", "command"), ("argument", "argument"),
+            ("not supported", "unsupported"), ("minimum", "minimum"), ("maximum", "maximum"),
+            ("unavailable", "unavailable"), ("not found", "not-found")) if word in raw]
+        raise RuntimeError(f"Remote HTTP {exc.code}; categories={','.join(sorted(set(categories))) or 'unclassified'}") from None
     except (urllib.error.URLError, TimeoutError):
         raise RuntimeError("Remote request timeout/unavailable; outcome may be unknown") from None
 
@@ -100,7 +108,7 @@ def budget(api):
             "scope": "reported charges; billing may lag; storage/request fees additional"}
 
 
-def preflight(api):
+def preflight(api, *, require_gpu=True):
     identity()
     volumes = [v for v in api.listing("/global-volumes", "globalVolumes") if v.get("name") == GLOBAL_NAME]
     if len(volumes) != 1 or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", volumes[0].get("id", "")):
@@ -115,7 +123,7 @@ def preflight(api):
         raise RuntimeError("MIG catalog rate missing or above $0.69/hour")
     regions = sorted(d["id"] for d in gpu.get("dataCenters", [])
                      if d.get("availability") in {"LOW", "MEDIUM", "HIGH"})
-    if not regions:
+    if require_gpu and not regions:
         raise RuntimeError("No MIG capacity")
     cpu = cpu_placement(api)
     return {"status": "passed", "read_only": True, "image": IMAGE,

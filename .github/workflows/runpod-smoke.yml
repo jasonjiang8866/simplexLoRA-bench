@@ -7,11 +7,16 @@ on:
         type: boolean
         default: false
         required: true
+      restore_from_run:
+        description: 'Optional prior Actions run ID (attempt 1): reuse verified GPU artifacts and run only CPU restore'
+        type: string
+        default: ''
   push:
     branches: [main]
     paths: ['runpod/provider.py', 'runpod/global_smoke.py', 'runpod/global_worker.py', '.github/workflows/runpod-smoke.yml']
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: simplex-runpod-smoke
   cancel-in-progress: false
@@ -35,11 +40,27 @@ jobs:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
         run: python runpod/global_smoke.py preflight
       - name: GPU smoke and fresh CPU cross-region restore
-        if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_smoke
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_smoke && inputs.restore_from_run == ''
         env:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
           CONFIRM_PAID_SMOKE: ${{ inputs.confirm_paid_smoke }}
         run: python runpod/global_smoke.py smoke
+      - name: Retrieve prior verified smoke evidence for CPU-only recovery
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_smoke && inputs.restore_from_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: jasonjiang8866/simplexLoRA-bench
+          run-id: ${{ inputs.restore_from_run }}
+          name: simplex-runpod-${{ inputs.restore_from_run }}-1
+          path: restore-input
+      - name: CPU-only cross-region restore of completed GPU smoke
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_smoke && inputs.restore_from_run != ''
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          CONFIRM_PAID_SMOKE: ${{ inputs.confirm_paid_smoke }}
+          RESTORE_FROM_RUN: ${{ inputs.restore_from_run }}
+        run: python runpod/global_smoke.py restore
       - name: Always release only this attempt's compute
         if: always()
         env:

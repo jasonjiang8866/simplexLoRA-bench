@@ -6,6 +6,9 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+import hashlib
+import sys
+import urllib.error
 from unittest.mock import patch
 
 import global_smoke as controller
@@ -135,6 +138,47 @@ class LifecycleTests(unittest.TestCase):
         with patch.object(provider.urllib.request, "build_opener", return_value=Opener()):
             provider.request("https://example.test/result", token="test-only")
         self.assertEqual(seen[0].get_header("User-agent"), "simplexlora-bench-actions/0.1")
+
+    def test_provider_errors_never_echo_raw_details(self):
+        class Opener:
+            def open(self, *_args, **_kwargs):
+                raise urllib.error.HTTPError('https://example.test', 400, 'bad', {},
+                    io.BytesIO(b'{"detail":"CPU disk minimum; private-token-123"}'))
+        with patch.object(provider.urllib.request, "build_opener", return_value=Opener()):
+            with self.assertRaises(RuntimeError) as caught:
+                provider.request("https://example.test", token="test-only")
+        self.assertIn("cpu,disk,minimum", str(caught.exception))
+        self.assertNotIn("private-token", str(caught.exception))
+
+    def test_restore_reuses_verified_smoke_and_never_launches_gpu(self):
+        r = result()
+        r['report'].update(mode='smoke', run_id='simplex-555-1', bundle={
+            'bytes': 4, 'sha256': hashlib.sha256(b'good').hexdigest()})
+        meta = {**metadata(), 'run_id': 'simplex-555-1', 'cleanup_confirmed': True,
+                'data_center': 'EU-TEST-1'}
+        base = Path(self.tmp.name)
+        previous = base / 'restore-input'
+        previous.mkdir()
+        (previous / 'result-smoke.json').write_text(json.dumps(r))
+        (previous / 'provision-smoke.json').write_text(json.dumps(meta))
+        (previous / 'smoke-evidence.tar').write_bytes(b'good')
+        cwd = Path.cwd()
+        try:
+            os.chdir(base)
+            with patch.dict(os.environ, {'GITHUB_REF': 'refs/heads/main', 'CONFIRM_PAID_SMOKE': 'true',
+                                          'RESTORE_FROM_RUN': '555'}), \
+                 patch.object(sys, 'argv', ['controller', 'restore']), \
+                 patch.object(controller, 'Runpod'), \
+                 patch.object(controller, 'preflight', return_value={'global_volume': {'id': 'global1'}}), \
+                 patch.object(controller, 'launch_phase', return_value={
+                     'pod_id': 'cpu', 'data_center': 'AP-TEST-1', 'report': r['report']}) as launch:
+                r['report']['global_path'] = '/global/simplexlora-bench/simplex-555-1'
+                (previous / 'result-smoke.json').write_text(json.dumps(r))
+                controller.main()
+                self.assertEqual(launch.call_count, 1)
+                self.assertEqual(launch.call_args.args[2], 'restore')
+        finally:
+            os.chdir(cwd)
 
     def test_cleanup_retains_volume_and_unrelated_pods(self):
         meta = {**metadata(), "name": "simplex-123-1-smoke", "started_epoch": 1, "rate": .69}
