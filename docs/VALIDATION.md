@@ -1,4 +1,15 @@
-# Validation record — 2026-10-30
+# Validation record
+
+## RunPod CUDA smoke — 2026-11-01
+
+See the [GPU smoke and Global Volume record](results/runpod-smoke-41324992190.md)
+for the immutable image, Actions runs, CUDA/int8 gate, six eight-step runs,
+cross-region persistence evidence and compute cleanup. The full performance
+benchmark remains pending. All 48 steps were inspected: zero nonfinite/missing
+gradient events, but 46 pre-clipping norm >100 flags; this is not a clean
+training-stability result.
+
+## Original isolated CPU validation — 2026-10-30
 
 Local isolated Python 3.12 environment: PyTorch 2.9.0+cpu,
 Transformers 4.57.1, PEFT 0.17.1, Accelerate 1.11.0.
@@ -18,8 +29,9 @@ a real tiny Qwen2 classifier and explicit CPU doubles for CUDA/data loading.
 Those fixture runs are temporary test data, not int8 benchmark evidence.
 
 CPU tests do not establish 8-bit GPU compatibility or benchmark performance.
-No GPU was available locally. Actual CUDA/int8 gate, six training runs,
-time-to-target, F1, peak VRAM, and GPU step time remain unmeasured.
+No GPU was available locally during that validation. At that time actual
+CUDA/int8 checks and GPU metrics were unmeasured; the later smoke record above
+supersedes that status for the short smoke configuration only.
 The Dockerfile and GitHub workflow provide separate image-build validation;
 consult the PR checks for their current result. No RunPod API create request
 was made during development.

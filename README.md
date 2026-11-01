@@ -5,8 +5,10 @@ standard LoRA **r=8** versus a paper-based SimplexLoRA implementation, with
 three paired seeds and a RunPod launch path.
 
 This is an engineering experiment, not a reproduction of the paper's reported
-scores. No GPU performance result is claimed until the CUDA gate and six runs
-have passed. The implementation uses stock PEFT; it does not install the
+scores. The [RunPod smoke record](docs/results/runpod-smoke-41324992190.md)
+contains real CUDA/int8 checks and six eight-step runs; the full performance
+benchmark remains pending. Smoke metrics do not establish either method's
+accuracy or speed advantage. The implementation uses stock PEFT; it does not install the
 authors' modified PEFT fork.
 
 | Default | Value |

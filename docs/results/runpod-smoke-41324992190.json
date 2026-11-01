@@ -1,0 +1,874 @@
+{
+  "scope": "eight-step smoke and persistence only; not a performance benchmark",
+  "date_utc": "2026-11-01",
+  "image_source_sha": "dd2913517f13061c97425873e822a02f4ee871b1",
+  "gpu_actions_run": "https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41324992190",
+  "gpu_workflow_conclusion": "failure: GPU passed; subsequent CPU create rejected disk=40",
+  "gpu_artifact": {
+    "id": 13090518350,
+    "name": "simplex-runpod-41324992190-1",
+    "zip_sha256": "f27648e277bc4f5df443d1c9c8befd5f5f480f7093998056a669ee2e9cfdc0ac"
+  },
+  "gpu_result": {
+    "status": "passed",
+    "phase": "complete",
+    "report": {
+      "mode": "smoke",
+      "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:cb5ce33250b8ced35892adbbcdc8c531eee67d5bab99192907a8fba4d701d342",
+      "run_id": "simplex-41324992190-1",
+      "global_volume_id": "cmvwmviz9000007jteci4ajn8",
+      "pod_id": "u9hxw7ozlqx4m8",
+      "controller_sha": "331ca64fad2b1344e5dab91e3835c94aa0bc59c0",
+      "source_hash": "4c9eaac04f2925e3bc51ac415cba8806a8b63ccb9a76a2cae1d5683ec141aaaa",
+      "gpu": {
+        "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+        "capability": [
+          12,
+          0
+        ],
+        "total_memory_bytes": 25367150592,
+        "cuda": "12.8"
+      },
+      "probe": {
+        "bytes": 8388608,
+        "sha256": "6fdbb6a2421616e3d8a32aea02291bac64a250cbe18b04acf8433d523c1f4551",
+        "write_and_readback_seconds": 0.05597112199757248
+      },
+      "compatibility": {
+        "status": "passed",
+        "device": "cuda",
+        "bits": 8,
+        "methods": {
+          "lora": {
+            "forward_backward": true,
+            "frozen_base": true,
+            "save_reload": true,
+            "max_logit_difference": 0.0,
+            "rank_events": 0
+          },
+          "simplex": {
+            "forward_backward": true,
+            "frozen_base": true,
+            "save_reload": true,
+            "max_logit_difference": 0.0,
+            "rank_events": 2
+          }
+        }
+      },
+      "summary": {
+        "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+        "runs": [
+          {
+            "status": "passed",
+            "method": "lora",
+            "seed": 17,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.566468253968254,
+            "test_macro_f1": 0.225,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.169896716019139,
+            "train_wall_seconds": 4.169896716019139,
+            "setup_seconds": 33.12570147507358,
+            "step_seconds_mean": 0.1876011362473946,
+            "steady_step_seconds_median": 0.12515402596909553,
+            "step_seconds_p95": 0.44860581462853566,
+            "peak_allocated_bytes": 1151707648,
+            "peak_reserved_bytes": 1189085184,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 347648,
+            "gradient_anomaly_steps": 8,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "simplex",
+            "seed": 17,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.48611111111111105,
+            "test_macro_f1": 0.2111111111111111,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.394056580029428,
+            "train_wall_seconds": 4.394056580029428,
+            "setup_seconds": 23.474527020007372,
+            "step_seconds_mean": 0.20439506288676057,
+            "steady_step_seconds_median": 0.12926527298986912,
+            "step_seconds_p95": 0.49487917263177195,
+            "peak_allocated_bytes": 1152181248,
+            "peak_reserved_bytes": 1193279488,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 345856,
+            "gradient_anomaly_steps": 8,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "lora",
+            "seed": 42,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.225,
+            "test_macro_f1": 0.08012820512820512,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.550890576909296,
+            "train_wall_seconds": 4.550890576909296,
+            "setup_seconds": 25.352819774998352,
+            "step_seconds_mean": 0.19935275075840764,
+            "steady_step_seconds_median": 0.13419356406666338,
+            "step_seconds_p95": 0.4712340494152156,
+            "peak_allocated_bytes": 1153359872,
+            "peak_reserved_bytes": 1189085184,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 347648,
+            "gradient_anomaly_steps": 8,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "simplex",
+            "seed": 42,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.18181818181818182,
+            "test_macro_f1": 0.11688311688311688,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.31283197295852,
+            "train_wall_seconds": 4.31283197295852,
+            "setup_seconds": 23.756835700012743,
+            "step_seconds_mean": 0.20815417886478826,
+            "steady_step_seconds_median": 0.12516250601038337,
+            "step_seconds_p95": 0.5257250770926473,
+            "peak_allocated_bytes": 1156575744,
+            "peak_reserved_bytes": 1195376640,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 347648,
+            "gradient_anomaly_steps": 8,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "lora",
+            "seed": 123,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.2987179487179487,
+            "test_macro_f1": 0.28055555555555556,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.482940501067787,
+            "train_wall_seconds": 4.482940501067787,
+            "setup_seconds": 23.507541917962953,
+            "step_seconds_mean": 0.20945986022707075,
+            "steady_step_seconds_median": 0.1409536829451099,
+            "step_seconds_p95": 0.5030645402148364,
+            "peak_allocated_bytes": 1151860736,
+            "peak_reserved_bytes": 1170210816,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 347648,
+            "gradient_anomaly_steps": 7,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "simplex",
+            "seed": 123,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.2987179487179487,
+            "test_macro_f1": 0.28055555555555556,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.405212739016861,
+            "train_wall_seconds": 4.405212739016861,
+            "setup_seconds": 23.140939928009175,
+            "step_seconds_mean": 0.20324492335203104,
+            "steady_step_seconds_median": 0.1266950989374891,
+            "step_seconds_p95": 0.4857526157458776,
+            "peak_allocated_bytes": 1156665344,
+            "peak_reserved_bytes": 1195376640,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 345856,
+            "gradient_anomaly_steps": 7,
+            "quantized_linear_count": 168
+          }
+        ],
+        "aggregates": {
+          "lora": {
+            "validation_macro_f1": {
+              "n": 3,
+              "mean": 0.3633954008954009,
+              "std": 0.1796872887328343
+            },
+            "test_macro_f1": {
+              "n": 3,
+              "mean": 0.19522792022792024,
+              "std": 0.10347735622008467
+            },
+            "step_seconds_mean": {
+              "n": 3,
+              "mean": 0.19880458241095766,
+              "std": 0.010939667266776296
+            },
+            "steady_step_seconds_median": {
+              "n": 3,
+              "mean": 0.13343375766028961,
+              "std": 0.007927185469717794
+            },
+            "peak_allocated_bytes": {
+              "n": 3,
+              "mean": 1152309418.6666667,
+              "std": 912933.8081533257
+            },
+            "peak_reserved_bytes": {
+              "n": 3,
+              "mean": 1182793728,
+              "std": 10897121.445584059
+            },
+            "gradient_anomaly_steps": {
+              "n": 3,
+              "mean": 7.666666666666667,
+              "std": 0.5773502691896257
+            },
+            "time_to_target": {
+              "reached": 0,
+              "total": 3,
+              "reached_only_mean_seconds": null
+            }
+          },
+          "simplex": {
+            "validation_macro_f1": {
+              "n": 3,
+              "mean": 0.3222157472157472,
+              "std": 0.15350132444086684
+            },
+            "test_macro_f1": {
+              "n": 3,
+              "mean": 0.20284992784992784,
+              "std": 0.08214835455991763
+            },
+            "step_seconds_mean": {
+              "n": 3,
+              "mean": 0.20526472170119328,
+              "std": 0.0025675722506922176
+            },
+            "steady_step_seconds_median": {
+              "n": 3,
+              "mean": 0.12704095931258053,
+              "std": 0.0020731350103848634
+            },
+            "peak_allocated_bytes": {
+              "n": 3,
+              "mean": 1155140778.6666667,
+              "std": 2563420.247482908
+            },
+            "peak_reserved_bytes": {
+              "n": 3,
+              "mean": 1194677589.3333333,
+              "std": 1210791.271731562
+            },
+            "gradient_anomaly_steps": {
+              "n": 3,
+              "mean": 7.666666666666667,
+              "std": 0.5773502691896257
+            },
+            "time_to_target": {
+              "reached": 0,
+              "total": 3,
+              "reached_only_mean_seconds": null
+            }
+          }
+        },
+        "paired": [
+          {
+            "seed": 17,
+            "test_f1_delta_simplex_minus_lora": -0.013888888888888895
+          },
+          {
+            "seed": 42,
+            "test_f1_delta_simplex_minus_lora": 0.03675491175491176
+          },
+          {
+            "seed": 123,
+            "test_f1_delta_simplex_minus_lora": 0.0
+          }
+        ]
+      },
+      "bundle": {
+        "bytes": 104028160,
+        "sha256": "07aa2f1f21f1ba8322468d0d21e87a8cae026b628dd003ed6c029d8a01403543"
+      },
+      "snapshot_sha256": "5c5006f30098fa6bb5ff01934becc55fd390bfec92bcd5b0d5d8e069aa2541cb",
+      "file_count": 110,
+      "global_path": "/global/simplexlora-bench/simplex-41324992190-1",
+      "seconds": 233.1407769829966
+    }
+  },
+  "gpu_provision": {
+    "name": "simplex-41324992190-1-smoke",
+    "run_id": "simplex-41324992190-1",
+    "phase": "smoke",
+    "controller_sha": "331ca64fad2b1344e5dab91e3835c94aa0bc59c0",
+    "volume_id": "cmvwmviz9000007jteci4ajn8",
+    "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:cb5ce33250b8ced35892adbbcdc8c531eee67d5bab99192907a8fba4d701d342",
+    "worker_sha256": "9e9183b4d25de0466f1bea2a28f519db58402bb87a2ee040239cdb2bb4ba2f39",
+    "started_epoch": 1793549470.2088208,
+    "pod_id": "u9hxw7ozlqx4m8",
+    "rate": 0.69,
+    "data_center": "EUR-IS-2",
+    "cleanup_confirmed": true,
+    "cleanup_at_epoch": 1793549714.3070836,
+    "elapsed_seconds": 244.09826278686523,
+    "compute_cost_estimate_usd": 0.0467855003674825
+  },
+  "resolved_manifest": {
+    "requested_config": {
+      "model": "Qwen/Qwen2.5-0.5B",
+      "model_revision": "main",
+      "dataset": "fancyzhx/ag_news",
+      "dataset_revision": "main",
+      "dataset_config": null,
+      "train_split": "train",
+      "test_split": "test",
+      "text_column": "text",
+      "label_column": "label",
+      "num_labels": 4,
+      "train_samples": 64,
+      "validation_samples": 16,
+      "test_samples": 16,
+      "data_seed": 20261030,
+      "seeds": [
+        17,
+        42,
+        123
+      ],
+      "bits": 8,
+      "rank": 8,
+      "alpha": 16,
+      "target_modules": [
+        "q_proj"
+      ],
+      "batch_size": 2,
+      "max_length": 32,
+      "steps": 8,
+      "eval_every": 2,
+      "target_f1": 0.85,
+      "lr": 0.0002,
+      "weight_decay": 0.01,
+      "warmup_steps": 1,
+      "rank_interval": 2,
+      "rank_updates": 2,
+      "weight_lr": 0.1,
+      "regularization": 0.01,
+      "timing_warmup_steps": 1,
+      "gradient_spike_norm": 100.0
+    },
+    "config": {
+      "model": "Qwen/Qwen2.5-0.5B",
+      "model_revision": "060db6499f32faf8b98477b0a26969ef7d8b9987",
+      "dataset": "fancyzhx/ag_news",
+      "dataset_revision": "eb185aade064a813bc0b7f42de02595523103ca4",
+      "dataset_config": null,
+      "train_split": "train",
+      "test_split": "test",
+      "text_column": "text",
+      "label_column": "label",
+      "num_labels": 4,
+      "train_samples": 64,
+      "validation_samples": 16,
+      "test_samples": 16,
+      "data_seed": 20261030,
+      "seeds": [
+        17,
+        42,
+        123
+      ],
+      "bits": 8,
+      "rank": 8,
+      "alpha": 16,
+      "target_modules": [
+        "q_proj"
+      ],
+      "batch_size": 2,
+      "max_length": 32,
+      "steps": 8,
+      "eval_every": 2,
+      "target_f1": 0.85,
+      "lr": 0.0002,
+      "weight_decay": 0.01,
+      "warmup_steps": 1,
+      "rank_interval": 2,
+      "rank_updates": 2,
+      "weight_lr": 0.1,
+      "regularization": 0.01,
+      "timing_warmup_steps": 1,
+      "gradient_spike_norm": 100.0
+    },
+    "source_hash": "4c9eaac04f2925e3bc51ac415cba8806a8b63ccb9a76a2cae1d5683ec141aaaa",
+    "created_utc": "2026-11-01T16:11:17Z",
+    "id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83"
+  },
+  "gradient_audit": {
+    "steps": 48,
+    "threshold_pre_clip_norm": 100,
+    "norm_spike_steps": 46,
+    "nonfinite_steps": 0,
+    "missing_steps": 0,
+    "min_pre_clip_norm": 14.911912028803453,
+    "max_pre_clip_norm": 348.1276254687972
+  },
+  "initial_canceled_attempt": {
+    "actions_run": "https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41323672930",
+    "conclusion": "cancelled",
+    "reason": "Result retrieval returned HTTP 403 before explicit User-Agent fix; not the accepted evidence set",
+    "provision": {
+      "name": "simplex-41323672930-1-smoke",
+      "run_id": "simplex-41323672930-1",
+      "phase": "smoke",
+      "controller_sha": "462344be7e819c1f8f4fdb318d7c649e847c6ab1",
+      "volume_id": "cmvwmviz9000007jteci4ajn8",
+      "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:cb5ce33250b8ced35892adbbcdc8c531eee67d5bab99192907a8fba4d701d342",
+      "worker_sha256": "9e9183b4d25de0466f1bea2a28f519db58402bb87a2ee040239cdb2bb4ba2f39",
+      "started_epoch": 1793548552.5376806,
+      "pod_id": "yvjd2ptddwfq4g",
+      "rate": 0.69,
+      "data_center": "EUR-IS-2",
+      "cleanup_confirmed": true,
+      "cleanup_at_epoch": 1793549313.2741985,
+      "elapsed_seconds": 760.736517906189,
+      "compute_cost_estimate_usd": 0.1458078325986862
+    }
+  },
+  "validation": {
+    "controller_unit_tests_passed": 13,
+    "ci_run": "https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41326118510",
+    "ci_controller_sha": "f3f42249ae3b2d77d1fc22413694a85b6ed8937e",
+    "passed_jobs": [
+      "cpu (3.11)",
+      "cpu (3.12)",
+      "docker"
+    ]
+  },
+  "restore_actions_run": "https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41326447241",
+  "restore_workflow_conclusion": "success",
+  "restore_artifact": {
+    "id": 13092185180,
+    "name": "simplex-runpod-41326447241-1",
+    "zip_sha256": "9fdccca94a969c23e3a83faafa1fdea52b36a470ebab430384ada9b5a5b58177"
+  },
+  "restore_result": {
+    "status": "passed",
+    "phase": "complete",
+    "report": {
+      "mode": "restore",
+      "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:cb5ce33250b8ced35892adbbcdc8c531eee67d5bab99192907a8fba4d701d342",
+      "run_id": "simplex-41324992190-1",
+      "global_volume_id": "cmvwmviz9000007jteci4ajn8",
+      "pod_id": "odoxt5al6lmhc8",
+      "controller_sha": "f3f42249ae3b2d77d1fc22413694a85b6ed8937e",
+      "source_hash": "4c9eaac04f2925e3bc51ac415cba8806a8b63ccb9a76a2cae1d5683ec141aaaa",
+      "compatibility": {
+        "status": "passed",
+        "device": "cuda",
+        "bits": 8,
+        "methods": {
+          "lora": {
+            "forward_backward": true,
+            "frozen_base": true,
+            "save_reload": true,
+            "max_logit_difference": 0.0,
+            "rank_events": 0
+          },
+          "simplex": {
+            "forward_backward": true,
+            "frozen_base": true,
+            "save_reload": true,
+            "max_logit_difference": 0.0,
+            "rank_events": 2
+          }
+        }
+      },
+      "summary": {
+        "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+        "runs": [
+          {
+            "status": "passed",
+            "method": "lora",
+            "seed": 17,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.566468253968254,
+            "test_macro_f1": 0.225,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.169896716019139,
+            "train_wall_seconds": 4.169896716019139,
+            "setup_seconds": 33.12570147507358,
+            "step_seconds_mean": 0.1876011362473946,
+            "steady_step_seconds_median": 0.12515402596909553,
+            "step_seconds_p95": 0.44860581462853566,
+            "peak_allocated_bytes": 1151707648,
+            "peak_reserved_bytes": 1189085184,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 347648,
+            "gradient_anomaly_steps": 8,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "simplex",
+            "seed": 17,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.48611111111111105,
+            "test_macro_f1": 0.2111111111111111,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.394056580029428,
+            "train_wall_seconds": 4.394056580029428,
+            "setup_seconds": 23.474527020007372,
+            "step_seconds_mean": 0.20439506288676057,
+            "steady_step_seconds_median": 0.12926527298986912,
+            "step_seconds_p95": 0.49487917263177195,
+            "peak_allocated_bytes": 1152181248,
+            "peak_reserved_bytes": 1193279488,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 345856,
+            "gradient_anomaly_steps": 8,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "lora",
+            "seed": 42,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.225,
+            "test_macro_f1": 0.08012820512820512,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.550890576909296,
+            "train_wall_seconds": 4.550890576909296,
+            "setup_seconds": 25.352819774998352,
+            "step_seconds_mean": 0.19935275075840764,
+            "steady_step_seconds_median": 0.13419356406666338,
+            "step_seconds_p95": 0.4712340494152156,
+            "peak_allocated_bytes": 1153359872,
+            "peak_reserved_bytes": 1189085184,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 347648,
+            "gradient_anomaly_steps": 8,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "simplex",
+            "seed": 42,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.18181818181818182,
+            "test_macro_f1": 0.11688311688311688,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.31283197295852,
+            "train_wall_seconds": 4.31283197295852,
+            "setup_seconds": 23.756835700012743,
+            "step_seconds_mean": 0.20815417886478826,
+            "steady_step_seconds_median": 0.12516250601038337,
+            "step_seconds_p95": 0.5257250770926473,
+            "peak_allocated_bytes": 1156575744,
+            "peak_reserved_bytes": 1195376640,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 347648,
+            "gradient_anomaly_steps": 8,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "lora",
+            "seed": 123,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.2987179487179487,
+            "test_macro_f1": 0.28055555555555556,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.482940501067787,
+            "train_wall_seconds": 4.482940501067787,
+            "setup_seconds": 23.507541917962953,
+            "step_seconds_mean": 0.20945986022707075,
+            "steady_step_seconds_median": 0.1409536829451099,
+            "step_seconds_p95": 0.5030645402148364,
+            "peak_allocated_bytes": 1151860736,
+            "peak_reserved_bytes": 1170210816,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 347648,
+            "gradient_anomaly_steps": 7,
+            "quantized_linear_count": 168
+          },
+          {
+            "status": "passed",
+            "method": "simplex",
+            "seed": 123,
+            "manifest_id": "3246c5d7e4eb9c44e5cab610b42f47483efc18b61a3241f6b98438b66efa2f83",
+            "steps": 8,
+            "data_hashes": {
+              "train": "9562ca6b28abb16db3a650e08c5693a9877467f4e8b81f9db15562c4fab7814c",
+              "validation": "494ea2ab7be42232b31002c64b48d36358cfb4a3c2285181350bc825c8b5df82",
+              "test": "716c56c35e969dc57311e415b49631cc2630229a2eb3d1b480a0f357859be6b2"
+            },
+            "validation_macro_f1": 0.2987179487179487,
+            "test_macro_f1": 0.28055555555555556,
+            "target_f1": 0.85,
+            "time_to_target_seconds": null,
+            "target_reached": false,
+            "censor_seconds": 4.405212739016861,
+            "train_wall_seconds": 4.405212739016861,
+            "setup_seconds": 23.140939928009175,
+            "step_seconds_mean": 0.20324492335203104,
+            "steady_step_seconds_median": 0.1266950989374891,
+            "step_seconds_p95": 0.4857526157458776,
+            "peak_allocated_bytes": 1156665344,
+            "peak_reserved_bytes": 1195376640,
+            "initial_trainable_parameters": 347648,
+            "final_trainable_parameters": 345856,
+            "gradient_anomaly_steps": 7,
+            "quantized_linear_count": 168
+          }
+        ],
+        "aggregates": {
+          "lora": {
+            "validation_macro_f1": {
+              "n": 3,
+              "mean": 0.3633954008954009,
+              "std": 0.1796872887328343
+            },
+            "test_macro_f1": {
+              "n": 3,
+              "mean": 0.19522792022792024,
+              "std": 0.10347735622008467
+            },
+            "step_seconds_mean": {
+              "n": 3,
+              "mean": 0.19880458241095766,
+              "std": 0.010939667266776296
+            },
+            "steady_step_seconds_median": {
+              "n": 3,
+              "mean": 0.13343375766028961,
+              "std": 0.007927185469717794
+            },
+            "peak_allocated_bytes": {
+              "n": 3,
+              "mean": 1152309418.6666667,
+              "std": 912933.8081533257
+            },
+            "peak_reserved_bytes": {
+              "n": 3,
+              "mean": 1182793728,
+              "std": 10897121.445584059
+            },
+            "gradient_anomaly_steps": {
+              "n": 3,
+              "mean": 7.666666666666667,
+              "std": 0.5773502691896257
+            },
+            "time_to_target": {
+              "reached": 0,
+              "total": 3,
+              "reached_only_mean_seconds": null
+            }
+          },
+          "simplex": {
+            "validation_macro_f1": {
+              "n": 3,
+              "mean": 0.3222157472157472,
+              "std": 0.15350132444086684
+            },
+            "test_macro_f1": {
+              "n": 3,
+              "mean": 0.20284992784992784,
+              "std": 0.08214835455991763
+            },
+            "step_seconds_mean": {
+              "n": 3,
+              "mean": 0.20526472170119328,
+              "std": 0.0025675722506922176
+            },
+            "steady_step_seconds_median": {
+              "n": 3,
+              "mean": 0.12704095931258053,
+              "std": 0.0020731350103848634
+            },
+            "peak_allocated_bytes": {
+              "n": 3,
+              "mean": 1155140778.6666667,
+              "std": 2563420.247482908
+            },
+            "peak_reserved_bytes": {
+              "n": 3,
+              "mean": 1194677589.3333333,
+              "std": 1210791.271731562
+            },
+            "gradient_anomaly_steps": {
+              "n": 3,
+              "mean": 7.666666666666667,
+              "std": 0.5773502691896257
+            },
+            "time_to_target": {
+              "reached": 0,
+              "total": 3,
+              "reached_only_mean_seconds": null
+            }
+          }
+        },
+        "paired": [
+          {
+            "seed": 17,
+            "test_f1_delta_simplex_minus_lora": -0.013888888888888895
+          },
+          {
+            "seed": 42,
+            "test_f1_delta_simplex_minus_lora": 0.03675491175491176
+          },
+          {
+            "seed": 123,
+            "test_f1_delta_simplex_minus_lora": 0.0
+          }
+        ]
+      },
+      "bundle": {
+        "bytes": 104028160,
+        "sha256": "07aa2f1f21f1ba8322468d0d21e87a8cae026b628dd003ed6c029d8a01403543"
+      },
+      "snapshot_sha256": "5c5006f30098fa6bb5ff01934becc55fd390bfec92bcd5b0d5d8e069aa2541cb",
+      "file_count": 110,
+      "writer_pod_id": "u9hxw7ozlqx4m8",
+      "probe": {
+        "bytes": 8388608,
+        "sha256": "6fdbb6a2421616e3d8a32aea02291bac64a250cbe18b04acf8433d523c1f4551"
+      },
+      "restored_checksums_verified": true,
+      "summary_revalidated": true,
+      "global_path": "/global/simplexlora-bench/simplex-41324992190-1",
+      "seconds": 6.727944929967634
+    }
+  },
+  "restore_provision": {
+    "name": "simplex-41326447241-1-restore",
+    "run_id": "simplex-41324992190-1",
+    "phase": "restore",
+    "controller_sha": "f3f42249ae3b2d77d1fc22413694a85b6ed8937e",
+    "owner_run_id": "simplex-41326447241-1",
+    "volume_id": "cmvwmviz9000007jteci4ajn8",
+    "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:cb5ce33250b8ced35892adbbcdc8c531eee67d5bab99192907a8fba4d701d342",
+    "worker_sha256": "9e9183b4d25de0466f1bea2a28f519db58402bb87a2ee040239cdb2bb4ba2f39",
+    "started_epoch": 1793550475.4789345,
+    "writer_pod_id": "u9hxw7ozlqx4m8",
+    "requested_cpu": {
+      "id": "cpu3c",
+      "region": "AP-JP-1",
+      "rate": 0.06
+    },
+    "pod_id": "odoxt5al6lmhc8",
+    "rate": 0.06,
+    "data_center": "AP-JP-1",
+    "cleanup_confirmed": true,
+    "cleanup_at_epoch": 1793550881.3650904,
+    "elapsed_seconds": 405.88615584373474,
+    "compute_cost_estimate_usd": 0.006764769264062245
+  },
+  "acceptance": {
+    "status": "passed",
+    "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:cb5ce33250b8ced35892adbbcdc8c531eee67d5bab99192907a8fba4d701d342",
+    "source_hash": "4c9eaac04f2925e3bc51ac415cba8806a8b63ccb9a76a2cae1d5683ec141aaaa",
+    "run_id": "simplex-41324992190-1",
+    "global_volume_id": "cmvwmviz9000007jteci4ajn8",
+    "smoke_pod_id": "u9hxw7ozlqx4m8",
+    "restore_pod_id": "odoxt5al6lmhc8",
+    "writer_region": "EUR-IS-2",
+    "reader_region": "AP-JP-1",
+    "different_regions": true,
+    "snapshot_sha256": "5c5006f30098fa6bb5ff01934becc55fd390bfec92bcd5b0d5d8e069aa2541cb",
+    "file_count": 110,
+    "global_path": "/global/simplexlora-bench/simplex-41324992190-1",
+    "six_smoke_runs_verified": true,
+    "cross_pod_restore_verified": true,
+    "performance_benchmark": false
+  },
+  "compute_cost_estimate_usd": {
+    "accepted_gpu_and_cpu": 0.053550269631544745,
+    "including_canceled_initial_gpu_attempt": 0.19935810223023095,
+    "basis": "wall time from create attempt to confirmed removal times observed hourly rate; estimate, not invoice; excludes storage/request/GitHub charges"
+  }
+}

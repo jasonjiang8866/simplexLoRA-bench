@@ -1,8 +1,8 @@
 # RunPod workflow
 
 The implementation provides both **start inside a Pod** and **create a Pod
-from your machine**. No account credentials are embedded. No Pod has been
-created by the repository setup.
+from your machine**. No account credentials are embedded. The Actions path
+also supports bounded smoke runs and independent Global Volume restore checks.
 
 ## Published image (2026-11-01)
 
@@ -34,8 +34,8 @@ the `linux/amd64` manifest, image configuration and all eight layer blobs.
 Each layer's byte count and SHA-256 matched its manifest descriptor. The image
 configuration confirms `/bin/bash /opt/bench/runpod/start.sh` as the entrypoint
 and `/opt/bench` as the working directory. This verifies public registry
-availability from the verification host; it is not a pull or startup test on
-an actual RunPod node.
+availability from the verification host. Actual RunPod pull/startup and CUDA
+smoke evidence are recorded separately below.
 
 The Dockerfile uses `pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime`, resolved
 in this build to
@@ -50,9 +50,10 @@ The workflow has `contents: read` and `packages: write` permissions and uses
 The Dockerfile includes `pip check`, non-CUDA tests and CPU PEFT compatibility
 checks. This publication reused the cached build layer containing those steps;
 it did not freshly execute those checks. **A successful image build is not a
-CUDA/int8 compatibility result or a GPU benchmark result.** No paid Pod was
-created for this release; actual RunPod startup, CUDA/int8 compatibility and
-the six GPU training runs remain to be validated.
+CUDA/int8 compatibility result or a GPU benchmark result.** The subsequent
+[2026-11-01 smoke record](../docs/results/runpod-smoke-41324992190.md) documents
+actual GPU execution and Global Volume persistence. The full 500-step
+performance benchmark remains pending.
 
 ## 1. Build and publish another revision
 
@@ -108,6 +109,20 @@ stop billing. Global Volume contents and unrelated Pods are retained.
 Download the `simplex-runpod-<run>-<attempt>` artifact for preflight, provision,
 result, cleanup and acceptance evidence. A passed preflight is not a smoke
 result; a smoke result is not the full performance benchmark.
+
+If GPU smoke succeeded but the later restore phase failed, dispatch with
+`confirm_paid_smoke=true` and `restore_from_run=<original Actions run ID>`.
+This retrieves attempt 1's artifact, checks the completed GPU result, archive
+SHA-256, volume identity and confirmed GPU cleanup, then rents **only a CPU**.
+The source artifact must still be available (14-day retention). The dataset
+keeps its original run ID; cleanup ownership belongs to the new Actions run.
+The small CPU flavor uses a 10 GB writable disk; the GPU uses 40 GB.
+
+The account budget check uses GraphQL; resource inventory and lifecycle use
+RunPod REST v2. Result requests identify the client with an explicit User-Agent.
+The result endpoint requires a per-attempt token; provider errors are logged
+only as fixed diagnostic categories. `Inspect managed RunPod compute` provides
+read-only checks of this repository's managed Pods.
 
 ### Console or regional-volume launcher
 
@@ -176,9 +191,11 @@ Inspect `console.log`, `exit-code.txt`, `compatibility.json` and
 Pod or the RunPod console. The API launcher does not expose a public service
 or configure SSH. Download results before deleting the volume.
 
-**The training timeout and container exit do not stop Pod billing.**
+For the console/regional-volume launcher, **the training timeout and container
+exit do not stop Pod billing.**
 Stop/terminate the Pod through RunPod after completion or failure; retain the
-network volume for results. No automatic destructive cleanup is performed.
+network volume for results. That launcher does not automatically remove compute;
+the Actions smoke controller described above does remove its own test Pods.
 
 Restarting with the same run ID verifies hashes and skips completed runs.
 Incomplete attempts are archived and restarted from zero. A changed image/source
