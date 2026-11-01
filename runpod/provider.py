@@ -87,7 +87,9 @@ def identity():
     return run + "-" + attempt
 
 
-def budget(api):
+def budget(api, reserve=1):
+    if not finite(reserve, .01):
+        raise ValueError("Invalid budget reserve")
     now = datetime.now(timezone.utc)
     result = request("https://api.runpod.io/graphql", token=api.key, method="POST", body={
         "query": "query SmokeBudget($start: DateTime!, $end: DateTime!) { myself { clientBalance currentSpendPerHr dailyCharges(startDate: $start, endDate: $end) { amount } } }",
@@ -101,9 +103,9 @@ def budget(api):
     amounts = [c.get("amount") for c in charges if isinstance(c, dict)]
     if len(amounts) != len(charges) or not all(finite(x, -math.inf) for x in amounts):
         raise RuntimeError("Invalid billing history")
-    if balance < 1 or sum(abs(x) for x in amounts) + spend + 1 > 500:
-        raise RuntimeError("Insufficient $1 reserve or $500 monthly budget headroom")
-    return {"reserve_usd": 1, "monthly_budget_usd": 500, "balance_sufficient": True,
+    if balance < reserve or sum(abs(x) for x in amounts) + spend + reserve > 500:
+        raise RuntimeError("Insufficient experiment reserve or $500 monthly budget headroom")
+    return {"reserve_usd": reserve, "monthly_budget_usd": 500, "balance_sufficient": True,
             "month_headroom_sufficient": True, "month_basis": "UTC", "checked_utc": now.isoformat(),
             "scope": "reported charges; billing may lag; storage/request fees additional"}
 

@@ -29,9 +29,78 @@ def seed_all(seed):
     torch.backends.cudnn.benchmark = False
 
 
+def parameter_group(name):
+    if name == "simplex_importance":
+        return "importance"
+    if "modules_to_save.default" in name:
+        return "head"
+    if "lora_A" in name:
+        return "adapter_A"
+    if "lora_B" in name:
+        return "adapter_B"
+    return "other"
+
+
+class ClassificationProbe:
+    """Observe the existing head; no extra forward, RNG draw or gradient edits."""
+    def __init__(self, model):
+        heads = [m for n, m in model.named_modules()
+                 if n.endswith("score.modules_to_save.default")]
+        if len(heads) != 1:
+            raise ValueError("Expected one active classification head")
+        self.head = heads[0]
+        self.inputs = None
+        self.handle = self.head.register_forward_pre_hook(self.capture)
+
+    def capture(self, module, args):
+        # Keep only a detached view until this step's backward completes.
+        self.inputs = args[0].detach()
+
+    @torch.no_grad()
+    def inspect(self, batch, output, pad_id):
+        logits, labels = output.logits.detach().float(), batch["labels"]
+        mask = batch["attention_mask"].bool()
+        positions = torch.arange(mask.shape[1], device=mask.device).expand_as(mask)
+        last = positions.masked_fill(~mask, -1).max(-1).values
+        by_id = positions.masked_fill(batch["input_ids"] == pad_id, -1).max(-1).values
+        if (last < 0).any() or not torch.equal(last, by_id):
+            raise RuntimeError("Attention-mask and classifier padding disagree")
+        hidden = self.inputs[torch.arange(len(labels), device=labels.device), last].float()
+        ce = torch.nn.functional.cross_entropy(logits, labels, reduction="mean")
+        if not torch.allclose(ce, output.loss.detach().float(), atol=1e-6, rtol=1e-5):
+            raise RuntimeError("Loss differs from batch-mean cross entropy")
+        reconstructed = torch.nn.functional.linear(hidden, self.head.weight.detach().float(),
+            self.head.bias.detach().float() if self.head.bias is not None else None)
+        if not torch.allclose(reconstructed, logits, atol=1e-4, rtol=1e-4):
+            raise RuntimeError("Classifier pooling/logits mismatch")
+        residual = logits.softmax(-1) - torch.nn.functional.one_hot(labels, logits.shape[-1])
+        expected = residual.T @ hidden / len(labels)
+        actual = self.head.weight.grad.float()
+        relative = float((expected - actual).norm() / expected.norm().clamp_min(1e-12))
+        if relative > 1e-4:
+            raise RuntimeError("Head gradient differs from analytic mean-CE gradient")
+        return {"mean_ce": float(ce), "logit_abs_max": float(logits.abs().max()),
+                "logit_std": float(logits.std(unbiased=False)),
+                "pooled_hidden_norm_mean": float(hidden.norm(dim=-1).mean()),
+                "analytic_head_grad_norm": float(expected.norm()),
+                "analytic_head_grad_relative_error": relative,
+                "nonpadding_tokens_mean": float(mask.sum(-1).float().mean()),
+                "label_counts": torch.bincount(labels, minlength=logits.shape[-1]).tolist(),
+                "batch_sha256": digest({k: v.detach().cpu().tolist() for k, v in batch.items()})}
+
+
+def optimizer_inventory(model, optimizer):
+    live = {id(p) for p in model.parameters() if p.requires_grad}
+    entries = [id(p) for g in optimizer.param_groups for p in g["params"]]
+    if len(entries) != len(set(entries)) or set(entries) != live:
+        raise RuntimeError("Missing, duplicate or stale optimizer parameters")
+    return {"parameter_tensors": len(entries), "state_tensors": len(optimizer.state)}
+
+
 def gradient_stats(named_parameters, spike_norm):
     missing, nonfinite, zero = [], [], []
     squared = 0.0
+    groups = {k: 0.0 for k in ("head", "adapter_A", "adapter_B", "importance", "other")}
     for name, parameter in named_parameters:
         if not parameter.requires_grad:
             continue
@@ -43,11 +112,14 @@ def gradient_stats(named_parameters, spike_norm):
         else:
             n = float(torch.linalg.vector_norm(g.float()))
             squared += n * n
+            group = parameter_group(name)
+            groups[group] += n * n
             if n == 0:
                 zero.append(name)
     norm = squared ** 0.5
     return {"norm": norm, "missing": missing, "nonfinite": nonfinite,
-            "zero": zero, "spike": norm > spike_norm}
+            "zero": zero, "spike": norm > spike_norm,
+            "group_norms": {k: v ** 0.5 for k, v in groups.items()}}
 
 
 def learning_rate(c, step, method):
@@ -55,7 +127,7 @@ def learning_rate(c, step, method):
     if method == "simplex" and step <= search:
         return c["lr"] * 0.1
     offset = search if method == "simplex" else 0
-    local, duration = step - offset, c["steps"] - offset
+    local, duration = step - offset, c.get("schedule_steps", c["steps"]) - offset
     warmup = min(c["warmup_steps"], max(0, duration - 1))
     if warmup and local <= warmup:
         return c["lr"] * local / warmup
@@ -164,6 +236,12 @@ def _train(c, method, seed, output, manifest_id):
     controller = SimplexController(model, c["rank"], c["rank_interval"], c["rank_updates"],
                                    c["weight_lr"], c["regularization"]) if method == "simplex" else None
     optimizer = rebuild_optimizer(model, None, c["lr"], c["weight_decay"])
+    probe = ClassificationProbe(model)
+    head_initial = {"std": float(probe.head.weight.detach().std()),
+                    "norm": float(probe.head.weight.detach().norm()),
+                    "sha256": __import__("hashlib").sha256(
+                        probe.head.weight.detach().cpu().numpy().tobytes()).hexdigest()}
+    optimizer_inventory(model, optimizer)
     initial_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     loader = DataLoader(splits["train"], batch_size=c["batch_size"], shuffle=True,
                         generator=torch.Generator().manual_seed(seed), num_workers=0)
@@ -176,7 +254,9 @@ def _train(c, method, seed, output, manifest_id):
         "packages": {p: importlib.metadata.version(p) for p in
                      ("torch", "transformers", "peft", "bitsandbytes", "datasets", "accelerate")},
         "gpu": torch.cuda.get_device_name(), "cuda": torch.version.cuda,
-        "quantized_linear_count": quantized, "setup_seconds": setup_seconds})
+        "quantized_linear_count": quantized, "setup_seconds": setup_seconds,
+        "head_initial": head_initial, "loss_reduction": "mean", "clip_max_norm": 1.0,
+        "pad_token_id": tokenizer.pad_token_id})
     synchronize()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
@@ -198,10 +278,13 @@ def _train(c, method, seed, output, manifest_id):
             lr = learning_rate(c, step, method)
             for group in optimizer.param_groups:
                 group["lr"] = lr
-            loss = model(**{k: v.cuda() for k, v in batch.items()}).loss
+            device_batch = {k: v.cuda() for k, v in batch.items()}
+            forward = model(**device_batch)
+            loss = forward.loss
             if not torch.isfinite(loss):
                 raise RuntimeError(f"Nonfinite loss at step {step}")
             loss.backward()
+            observation = probe.inspect(device_batch, forward, tokenizer.pad_token_id)
             params = list(model.named_parameters())
             if controller and not controller.frozen:
                 params.append(("simplex_importance", controller.weights))
@@ -211,12 +294,21 @@ def _train(c, method, seed, output, manifest_id):
                 atomic_json(output / "anomalies.json", anomalies)
             if stats["nonfinite"] or stats["missing"]:
                 raise RuntimeError(f"Invalid gradients at step {step}: {stats}")
-            torch.nn.utils.clip_grad_norm_([p for _, p in params if p.requires_grad],
+            clip_norm = torch.nn.utils.clip_grad_norm_([p for _, p in params if p.requires_grad],
                                           max_norm=1.0, error_if_nonfinite=True)
+            stats["clip_coefficient"] = min(1.0, 1.0 / (float(clip_norm) + 1e-6))
+            stats["post_clip"] = gradient_stats(params, c["gradient_spike_norm"])
+            if stats["post_clip"]["norm"] > 1.00001:
+                raise RuntimeError("Gradient clipping failed")
             optimizer.step()
+            head_state = optimizer.state.get(probe.head.weight)
+            ranks_before = {n: m.r["default"] for n, m in controller.layers.items()} if controller else None
             changed = controller.step(step) if controller else False
             if changed:
                 optimizer = rebuild_optimizer(model, optimizer, lr, c["weight_decay"])
+                if optimizer.state.get(probe.head.weight) is not head_state:
+                    raise RuntimeError("Classifier optimizer moments lost on rank update")
+            inventory = optimizer_inventory(model, optimizer)
             synchronize()
             seconds = time.perf_counter() - before
             step_times.append(seconds)
@@ -224,7 +316,10 @@ def _train(c, method, seed, output, manifest_id):
                     step > c["rank_interval"] * c["rank_updates"] + c["timing_warmup_steps"]):
                 stable_times.append(seconds)
             log.write(json.dumps({"step": step, "loss": float(loss.detach()), "lr": lr,
-                                  "seconds": seconds, "rank_update": changed, "gradients": stats},
+                                  "seconds": seconds, "rank_update": changed, "gradients": stats,
+                                  "observations": observation, "optimizer": inventory,
+                                  "ranks_before": ranks_before if changed else None,
+                                  "ranks_after": controller.history[-1] if changed else None},
                                  allow_nan=False) + "\n")
             if step % c["eval_every"] == 0 or step == c["steps"]:
                 f1 = evaluate(model, evaluations["validation"], c["num_labels"])

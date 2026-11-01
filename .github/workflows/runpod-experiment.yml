@@ -1,0 +1,106 @@
+name: RunPod gradient diagnosis and full benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [diagnostic, benchmark]
+        default: diagnostic
+      image:
+        description: 'Published immutable ghcr.io/...@sha256 digest'
+        type: string
+        required: true
+      image_source_sha:
+        description: 'Exact published 40-character source commit (checkout and image must match)'
+        type: string
+        required: true
+      gpu_minutes:
+        description: 'GPU lifetime deadline: diagnostic <=45m, benchmark <=180m'
+        type: number
+        default: 45
+      max_compute_usd:
+        description: 'Authorized compute cap including 5m/phase cleanup reserve; storage extra'
+        type: number
+        default: 0.65
+      confirm_paid_experiment:
+        type: boolean
+        default: false
+      restore_from_run:
+        description: 'Optional previous experiment Actions run (attempt 1); CPU-only restore'
+        type: string
+        default: ''
+      diagnosis_review_run:
+        description: 'For benchmark: reviewed diagnosis artifact run; must match image/source'
+        type: string
+        default: ''
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: simplex-runpod-smoke
+  cancel-in-progress: false
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 220
+    env:
+      EXPERIMENT_MODE: ${{ inputs.mode }}
+      EXPERIMENT_IMAGE: ${{ inputs.image }}
+      IMAGE_SOURCE_SHA: ${{ inputs.image_source_sha }}
+      GPU_MINUTES: ${{ inputs.gpu_minutes }}
+      MAX_COMPUTE_USD: ${{ inputs.max_compute_usd }}
+      CONFIRM_PAID_EXPERIMENT: ${{ inputs.confirm_paid_experiment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.image_source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin controller identity to checked out image source
+        run: echo "CONTROLLER_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Lifecycle regressions
+        run: python -m unittest discover -s runpod -p 'test_*.py' -v
+      - uses: actions/download-artifact@v4
+        if: inputs.diagnosis_review_run != ''
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.diagnosis_review_run }}
+          name: diagnosis-review
+          path: .
+      - uses: actions/download-artifact@v4
+        if: inputs.restore_from_run != ''
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.restore_from_run }}
+          name: simplex-experiment-${{ inputs.restore_from_run }}-1
+          path: restore-input
+      - name: Read-only dry-run
+        if: '!inputs.confirm_paid_experiment'
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: python runpod/experiment.py dry-run
+      - name: Paid experiment
+        if: inputs.confirm_paid_experiment && inputs.restore_from_run == ''
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: python runpod/experiment.py run
+      - name: CPU-only recovery
+        if: inputs.confirm_paid_experiment && inputs.restore_from_run != ''
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: python runpod/experiment.py restore
+      - name: Always confirm compute removal
+        if: always()
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: python runpod/experiment.py cleanup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simplex-experiment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runpod-results/
+          retention-days: 90
+          compression-level: 1
+          if-no-files-found: error

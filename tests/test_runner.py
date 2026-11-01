@@ -49,3 +49,26 @@ def test_training_loop_with_cpu_fixture(tmp_path, monkeypatch, method):
     result = runner.train(config, method, 17, output, manifest["id"])
     assert result["steps"] == 8
     assert verify_run(output, manifest, method, 17)["status"] == "passed"
+
+
+def test_gradient_group_decomposition_and_clipping():
+    params = []
+    for name, grad in [('score.modules_to_save.default.weight', 300.),
+                       ('layer.lora_B.default.weight', 400.),
+                       ('layer.lora_A.default.weight', 0.), ('simplex_importance', 0.)]:
+        p = torch.nn.Parameter(torch.ones(1)); p.grad = torch.tensor([grad]); params.append((name, p))
+    before = runner.gradient_stats(params, 100.)
+    assert before['norm'] == 500.
+    assert before['group_norms']['head'] == 300.
+    assert before['group_norms']['adapter_B'] == 400.
+    assert before['missing'] == before['nonfinite'] == []
+    torch.nn.utils.clip_grad_norm_([p for _, p in params], 1.)
+    assert runner.gradient_stats(params, 100.)['norm'] == pytest.approx(1.)
+
+
+def test_diagnostic_lr_is_exact_full_run_prefix():
+    full = json.loads((Path(__file__).parents[1] / 'configs/benchmark.json').read_text())
+    diag = json.loads((Path(__file__).parents[1] / 'configs/diagnostic.json').read_text())
+    for method in ['lora', 'simplex']:
+        assert [runner.learning_rate(full, s, method) for s in range(1, 51)] == [
+            runner.learning_rate(diag, s, method) for s in range(1, 51)]
