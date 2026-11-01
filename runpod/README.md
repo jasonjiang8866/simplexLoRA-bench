@@ -4,15 +4,63 @@ The implementation provides both **start inside a Pod** and **create a Pod
 from your machine**. No account credentials are embedded. No Pod has been
 created by the repository setup.
 
-## 1. Build and publish
+## Published image (2026-11-01)
 
-CI builds the CUDA 12.8 / PyTorch 2.9.0 image and runs CPU regression/compatibility
-inside it. The current environment cannot run Docker or CUDA.
+The first image was published by the existing manual
+[Publish RunPod image run](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41320152026)
+(completed successfully). The
+[GHCR package](https://github.com/jasonjiang8866/simplexLoRA-bench/pkgs/container/simplexlora-bench)
+is **Public**; registry credentials are not required to pull it.
 
-Once the workflow is on the default branch, run **Publish RunPod image** in
-GitHub Actions. The job publishes a commit tag and uploads `image.txt` with
-the immutable digest. Make the GHCR package public for the launcher below,
-or configure registry authentication through the RunPod console.
+| Item | Verified value |
+|---|---|
+| Source main SHA at publication | `dd2913517f13061c97425873e822a02f4ee871b1` |
+| Tag | `ghcr.io/jasonjiang8866/simplexlora-bench:sha-dd2913517f13061c97425873e822a02f4ee871b1` |
+| Immutable image index digest | `sha256:cb5ce33250b8ced35892adbbcdc8c531eee67d5bab99192907a8fba4d701d342` |
+| Platform | `linux/amd64` |
+| Platform manifest digest | `sha256:cafcab6d4df1ea3d5909550f7c7fb5b03d099fabdd83b49a952e2462bebe4b4b` |
+| Workflow artifact | `runpod-image-reference` containing `image.txt` |
+
+Use this exact reference for deployment and the launcher examples below:
+
+```bash
+export BENCH_IMAGE_DIGEST='ghcr.io/jasonjiang8866/simplexlora-bench@sha256:cb5ce33250b8ced35892adbbcdc8c531eee67d5bab99192907a8fba4d701d342'
+```
+
+The tag, workflow output and registry manifest digest agree. The image contains
+the source SHA above; subsequent documentation commits do not change its code.
+Anonymous OCI registry verification retrieved the index by tag and digest,
+the `linux/amd64` manifest, image configuration and all eight layer blobs.
+Each layer's byte count and SHA-256 matched its manifest descriptor. The image
+configuration confirms `/bin/bash /opt/bench/runpod/start.sh` as the entrypoint
+and `/opt/bench` as the working directory. This verifies public registry
+availability from the verification host; it is not a pull or startup test on
+an actual RunPod node.
+
+The Dockerfile uses `pytorch/pytorch:2.9.0-cuda12.8-cudnn9-runtime`, resolved
+in this build to
+`sha256:f0ca81b440e252399d9954a45b616ee2540959466aacf3dfc3f856691eee66e8`.
+Direct runtime dependencies are pinned: torch 2.9.0, transformers 4.57.1,
+peft 0.17.1, accelerate 1.11.0, datasets 4.3.0, huggingface-hub 0.36.0,
+scikit-learn 1.7.2, numpy 2.2.6, safetensors 0.6.2 and bitsandbytes 0.48.1;
+pytest is pinned to 8.4.2. Transitive dependencies are not fully locked.
+The workflow has `contents: read` and `packages: write` permissions and uses
+`GITHUB_TOKEN` for GHCR publication.
+
+The Dockerfile includes `pip check`, non-CUDA tests and CPU PEFT compatibility
+checks. This publication reused the cached build layer containing those steps;
+it did not freshly execute those checks. **A successful image build is not a
+CUDA/int8 compatibility result or a GPU benchmark result.** No paid Pod was
+created for this release; actual RunPod startup, CUDA/int8 compatibility and
+the six GPU training runs remain to be validated.
+
+## 1. Build and publish another revision
+
+Run **Publish RunPod image** on the desired branch in GitHub Actions. The job
+builds the CUDA 12.8 / PyTorch 2.9.0 image, publishes a source commit tag and
+uploads `image.txt` with the immutable digest. Keep the GHCR package public
+for the supplied launcher, or configure registry authentication through the
+RunPod console if using a private image.
 
 Alternatively, build/push locally:
 
@@ -22,7 +70,7 @@ docker push ghcr.io/jasonjiang8866/simplexlora-bench:experiment
 docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/jasonjiang8866/simplexlora-bench:experiment
 ```
 
-Use the returned digest; no usable image digest is invented in this repository.
+Use the returned digest for a new build instead of the first-release digest.
 The image includes the source revision's code; startup does not clone a mutable
 branch or install extra packages. A dedicated venv isolates project dependencies
 from the container's user environment while reusing its PyTorch installation.
@@ -44,7 +92,25 @@ Results and Hugging Face cache persist under `/workspace/results/<run-id>`
 and `/workspace/huggingface`.
 
 The smoke preset uses three seeds × two methods × eight steps. Its F1 values
-are pipeline diagnostics only. A failing gate blocks the full experiment.
+are pipeline diagnostics only. After resolving the model/dataset revisions,
+the matrix runner executes `python -m simplexbench.compat --cuda` before any
+training worker. A failing gate blocks all six workers in either mode.
+
+The release was checked with the real digest using the following dry-run:
+
+```bash
+python runpod/launch.py \
+  --image "$BENCH_IMAGE_DIGEST" \
+  --network-volume DRY_RUN_VOLUME \
+  --data-center DRY_RUN_DATA_CENTER \
+  --run-id simplex-smoke-image-validation --mode smoke
+```
+
+The output had `dry_run: true`, the exact digest, one GPU and
+`BENCH_MODE=smoke`. The placement IDs above are placeholders, not existing
+resources. No create request was sent. A mocked subprocess control-flow check
+also verified that the CUDA gate runs before the six workers and that gate
+failure prevents every worker from starting; this did not execute CUDA.
 
 To launch via API from your own machine, first preview the exact payload:
 
