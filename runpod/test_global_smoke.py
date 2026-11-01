@@ -122,6 +122,25 @@ class LifecycleTests(unittest.TestCase):
             with self.assertRaises(controller.PhaseDeadline):
                 provider.request("https://api.runpod.io/v2/pods", token="test-only")
 
+    def test_cpu_restore_uses_small_disk_and_separate_owner_identity(self):
+        class API:
+            body = None
+            def call(self, path, method="GET", body=None):
+                self.body = body
+                raise RuntimeError("test ends before any create")
+        api = API()
+        prior = {'run_id': 'simplex-555-1', 'pod_id': 'oldpod', 'data_center': 'EU-TEST-1',
+                 'report': {'snapshot_sha256': 'a' * 64}}
+        with patch.object(controller, 'cpu_placement', return_value={
+                'id': 'cpu3c', 'region': 'AP-TEST-1', 'rate': .06}), \
+             patch.object(controller, 'cleanup'):
+            with self.assertRaises(RuntimeError):
+                controller.launch_phase(api, {'global_volume': {'id': 'global1'}}, 'restore', prior=prior)
+        self.assertNotIn('gpu', api.body)
+        self.assertEqual(api.body['disk'], 10)
+        self.assertEqual(api.body['name'], 'simplex-123-1-restore')
+        self.assertEqual(api.body['env']['BENCH_RUN_ID'], 'simplex-555-1')
+
     def test_http_client_has_explicit_identity(self):
         seen = []
         class Response:

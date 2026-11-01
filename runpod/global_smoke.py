@@ -157,7 +157,10 @@ def launch_phase(api, config, phase, *, prior=None):
         cap, deadline = .69, time.time() + 2700
     else:
         cpu = cpu_placement(api, exclude=prior["data_center"])
-        body.update(cpu={"id": cpu["id"], "vcpuCount": 2}, dataCenterIds=[cpu["region"]])
+        # Small CPU flavors reject the GPU's 40 GB writable disk request.
+        # Restore stages only the bounded completed-result archive and its files.
+        body.update(cpu={"id": cpu["id"], "vcpuCount": 2}, disk=10,
+                    dataCenterIds=[cpu["region"]])
         body["env"]["SIMPLEX_SNAPSHOT_SHA256"] = prior["report"]["snapshot_sha256"]
         meta["writer_pod_id"] = prior["pod_id"]
         meta["requested_cpu"] = cpu
