@@ -1,5 +1,13 @@
 # Validation record
 
+## Gradient diagnosis preparation — 2026-11-02 SGT
+
+See [preflight evidence](results/gradient-diagnosis-preflight.md). New probes,
+29 CPU tests, 16 lifecycle tests, CPU PEFT gates, image publication and read-only
+RunPod dry-run passed. Paid GPU diagnosis awaits budget approval; the six full
+500-step benchmark runs remain pending.
+
+
 ## RunPod CUDA smoke — 2026-11-01
 
 See the [GPU smoke and Global Volume record](results/runpod-smoke-41324992190.md)

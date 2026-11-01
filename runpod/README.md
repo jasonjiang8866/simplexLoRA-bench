@@ -256,3 +256,19 @@ python runpod/analyze_gradients.py smoke-evidence.tar --output gradients.json
 The archive retains the historical filename `smoke-evidence.tar` because it
 reuses the verified transport; `plan.json`, acceptance `performance_benchmark`,
 resolved config and each run's step count distinguish the actual experiment.
+
+### Verified diagnostic image and dry-run — 2026-11-02 SGT
+
+- Source: `b5d40812c9ba7eb1a8ef8c28d4b9e0e262367753` (PR #2, merged).
+- Image: `ghcr.io/jasonjiang8866/simplexlora-bench@sha256:2d630d23e069ed5b486520dbd303c3c35a7cc8c56ec79d269c710819adf7fa08`.
+- Training source hash: `2f1b91c4b02e5d0b937edfd962ef941cb6f1f1497cf3470eba93d4be971734b9`.
+- [Image publication](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330245339): success; 29 CPU tests and the CPU PEFT gate executed inside the new image build.
+- The public registry tag and computed OCI index hash match the digest above;
+  downloaded `image.txt` agrees. The historical smoke image is unchanged.
+- [Experiment dry-run](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330661456): success. `diagnostic`, 45 GPU minutes, $0.65 proposed compute cap, $0.641667 ceiling including cleanup reserve. **No paid dispatch has occurred.**
+- [Inventory check](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330478365): zero managed Pods. Preflight reported zero account Pods, MIG $0.69/h with EUR-IS-2/US-PA-1/US-WA-1 availability, CPU cpu3c AP-JP-1 $0.06/h, and the expected Global Volume.
+
+The paid diagnostic launch is awaiting explicit approval of its $0.65 cap.
+After it completes, use its measured training/evaluation/setup times to estimate
+and request the separate full-benchmark budget. Neither diagnostic GPU evidence
+nor six full 500-step runs exist for this new image yet.

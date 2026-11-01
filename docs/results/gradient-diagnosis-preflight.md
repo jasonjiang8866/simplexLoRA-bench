@@ -26,3 +26,20 @@ uses the exact first 50 learning rates of the 500-step schedule.
 
 No threshold or training hyperparameter is adjusted. GPU diagnosis and formal
 500-step results are pending; CPU tests and image builds do not replace them.
+
+## Completed preparation
+
+PR #2 merged as `2d8698c128a128729fc3007f9480284308b5a43e`.
+[PR CI](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330090708)
+passed Python 3.11/3.12 CPU regressions, PEFT gates and Docker build.
+Local results: 29 CPU tests (one CUDA test deselected), 16 lifecycle tests,
+CPU forward/backward/frozen-base/reload for both methods with zero logit delta.
+The new image and successful read-only experiment plan are recorded in
+[RunPod deployment instructions](../../runpod/README.md#verified-diagnostic-image-and-dry-run--2026-11-02-sgt).
+
+Paid diagnostic submission was blocked before dispatch because the proposed
+$0.65 compute cap needs explicit user approval. The form was canceled; no new
+GPU/CPU Pod was created. The next action is a diagnostic dispatch with the exact
+recorded image/source, followed by evidence review and full-run cost estimation.
+The formal 500-step run requires a separate explicit compute limit. No
+`diagnosis-review.json` with a proceed decision has been written.
