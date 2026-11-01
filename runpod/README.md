@@ -277,9 +277,14 @@ resolved config and each run's step count distinguish the actual experiment.
 - [Experiment dry-run](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330661456): success. `diagnostic`, 45 GPU minutes, $0.65 proposed compute cap, $0.641667 ceiling including cleanup reserve. This preparation run created no compute.
 - [Inventory check](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330478365): zero managed Pods. Preflight reported zero account Pods, MIG $0.69/h with EUR-IS-2/US-PA-1/US-WA-1 availability, CPU cpu3c AP-JP-1 $0.06/h, and the expected Global Volume.
 
-The user subsequently approved a total $10 session budget. [Diagnostic run 41331245400](../docs/results/gradient-diagnosis-41331245400.md) completed successfully, including independent CPU restoration and confirmed cleanup, at estimated compute cost $0.12654. The planned full run uses the same image, a 75-minute GPU deadline and $1 compute cap; its result remains pending.
+The user subsequently approved a total $10 session budget. [Diagnostic run 41331245400](../docs/results/gradient-diagnosis-41331245400.md) completed successfully, including independent CPU restoration and confirmed cleanup, at estimated compute cost $0.12654. The [full six-run benchmark](../docs/results/benchmark-41333468131.md) then completed using the same image, a 75-minute GPU deadline and $1 compute cap. Its compute estimate is $0.431960; diagnostic plus formal total is $0.558499, excluding existing storage/request charges.
 
 ### Current formal dispatch
+
+**Verified complete:** six 500-step workers, CUDA/int8 gate and CPU restore;
+both Pods deleted. [Final inspection](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41336870451)
+confirmed zero managed Pods. Global Volume data remains at
+`/global/simplexlora-bench/simplex-41333468131-1/`.
 
 The formal read-only [dry-run 41333320173](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41333320173)
 passed with zero account Pods, MIG $0.69/h and cpu3c $0.06/h. Paid formal

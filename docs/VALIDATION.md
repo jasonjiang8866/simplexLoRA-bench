@@ -1,8 +1,26 @@
 # Validation record
 
+## Formal six-run benchmark — 2026-11-01 UTC / 2026-11-02 SGT
+
+[Full report and raw evidence](results/benchmark-41333468131.md): all six
+independent runs completed 500 steps, after the actual CUDA/int8 gate. All
+3000 steps had finite, present gradients and verified clipping; norm >100 flags
+remain 141/1500 for LoRA and 206/1500 for Simplex. All six reached validation
+F1 0.85. The three-seed test F1 means are 0.884845 and 0.883818 respectively;
+this small comparison does not establish general method superiority.
+
+Global Volume restoration on a fresh CPU in AP-JP-1 verified 110 files and
+reproduced the GPU summary from US-PA-1. A local independent checkpoint/hash
+validation also reproduced it byte-for-byte. Both Pods were deleted; final
+inspection run 41336870451 reported zero managed Pods. Estimated diagnostic
+plus formal compute was $0.558499 within the approved $10 session budget.
+
+This completion is separate evidence from 29 CPU tests, 16 lifecycle tests,
+Docker publication, the original eight-step GPU smoke, and the diagnostic runs.
+
 ## Gradient diagnosis — 2026-11-02 SGT
 
-[Six 50-step GPU runs and CPU cross-region restoration passed](results/gradient-diagnosis-41331245400.md). All 300 steps passed analytic head-gradient, padding/loss, clipping and optimizer checks; both Pods were deleted. Large norms and near-unit importance weights remain reported limitations, not suppressed flags. Full 500-step performance results are pending.
+[Six 50-step GPU runs and CPU cross-region restoration passed](results/gradient-diagnosis-41331245400.md). All 300 steps passed analytic head-gradient, padding/loss, clipping and optimizer checks; both Pods were deleted. Large norms and near-unit importance weights remain reported limitations, not suppressed flags. The subsequent formal results are recorded above.
 
 ## Gradient diagnosis preparation — 2026-11-02 SGT
 

@@ -109,6 +109,35 @@ def report(archive):
                 'paired_f1_delta_summary': describe(deltas)}
 
 
+def compare_prefix(baseline, completed):
+    """Compare measured prefixes without assuming bitwise CUDA reproducibility."""
+    comparisons = []
+    with tarfile.open(baseline, 'r:') as old, tarfile.open(completed, 'r:') as new:
+        def read(tar, name):
+            return tar.extractfile(name).read()
+        configs = [json.loads(read(t, 'manifest.json')) for t in (old,new)]
+        for seed in (17,42,123):
+            for method in ('lora','simplex'):
+                key=f'{method}-{seed}'
+                a,b = [[json.loads(line) for line in read(t,key+'/steps.jsonl').splitlines()] for t in (old,new)]
+                b=b[:len(a)]
+                if len(a)!=len(b): raise ValueError('Baseline longer than completed run')
+                heads=[json.loads(read(t,key+'/provenance.json'))['head_initial']['sha256'] for t in (old,new)]
+                comparisons.append({'method':method,'seed':seed,'compared_steps':len(a),
+                    'batch_hashes_equal':all(x['observations']['batch_sha256']==y['observations']['batch_sha256'] for x,y in zip(a,b)),
+                    'initial_heads_equal':heads[0]==heads[1],
+                    'learning_rates_equal':all(x['lr']==y['lr'] for x,y in zip(a,b)),
+                    'rank_histories_equal':read(old,key+'/ranks.json')==read(new,key+'/ranks.json'),
+                    'max_abs_loss_delta':max(abs(x['loss']-y['loss']) for x,y in zip(a,b)),
+                    'max_abs_gradient_norm_delta':max(abs(x['gradients']['norm']-y['gradients']['norm']) for x,y in zip(a,b))})
+    return {'baseline_archive_sha256': hashlib.file_digest(Path(baseline).open('rb'),'sha256').hexdigest(),
+            'same_training_source_hash':configs[0]['source_hash']==configs[1]['source_hash'],
+            'runs':comparisons}
+
+
 if __name__ == '__main__':
     p=argparse.ArgumentParser();p.add_argument('archive');p.add_argument('--output',required=True)
-    args=p.parse_args();Path(args.output).write_text(json.dumps(report(args.archive),indent=2,allow_nan=False)+'\n')
+    p.add_argument('--baseline',help='Optional completed diagnostic archive for measured prefix comparison')
+    args=p.parse_args();result=report(args.archive)
+    if args.baseline: result['diagnostic_prefix_comparison']=compare_prefix(args.baseline,args.archive)
+    Path(args.output).write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')

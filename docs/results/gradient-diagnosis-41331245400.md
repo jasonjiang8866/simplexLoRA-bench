@@ -115,3 +115,9 @@ Use a **75-minute GPU deadline and $1 compute cap**; the ceiling including
 headroom within the user's approved total $10. Recheck live inventory, rate,
 account budget and absence of managed Pods before creation. Formal results
 remain pending until all six 500-step workers and restoration pass.
+
+**Subsequent outcome:** the [formal benchmark](benchmark-41333468131.md)
+completed all six 500-step runs and cross-region restoration. All six measured
+50-step prefixes match this diagnosis exactly for batches, initial heads,
+learning rates, losses, gradient norms and rank histories. The original
+diagnostic and smoke archives are retained unchanged.

@@ -4,11 +4,20 @@ An isolated **8-bit frozen base + sequence-classification head** benchmark:
 standard LoRA **r=8** versus a paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206) implementation, with
 three paired seeds and a RunPod launch path.
 
+The [full GPU benchmark](docs/results/benchmark-41333468131.md) is complete:
+six independent 500-step runs, real CUDA/int8 gate, verified cross-region
+restoration and zero remaining managed Pods. Test macro-F1 (three-seed mean ±
+sample SD) is **0.884845 ± 0.005803 for LoRA** and **0.883818 ± 0.005387 for
+Simplex**; paired Simplex-minus-LoRA difference is −0.001027 ± 0.001091.
+Both methods reach validation F1 0.85 in 3/3 runs. These three seeds establish
+neither statistical equivalence nor a general accuracy/speed advantage.
+
 This is an engineering experiment, not a reproduction of the paper's reported
-scores. The [RunPod smoke record](docs/results/runpod-smoke-41324992190.md)
-contains real CUDA/int8 checks and six eight-step runs; the full performance
-benchmark remains pending. The [50-step gradient diagnosis](docs/results/gradient-diagnosis-41331245400.md) passed with the original training settings; large norms are dominated by the classifier head. Smoke metrics do not establish either method's
-accuracy or speed advantage. The implementation uses stock PEFT; it does not install the
+scores. The [50-step gradient diagnosis](docs/results/gradient-diagnosis-41331245400.md)
+found head/feature scale behind large norms; original clipping and flags were
+retained. Near-unit importance weights and floor rank allocation remain a
+limitation. The [earlier eight-step smoke](docs/results/runpod-smoke-41324992190.md)
+is separate pipeline evidence. The implementation uses stock PEFT, not the
 authors' modified PEFT fork.
 
 | Default | Value |

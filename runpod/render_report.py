@@ -37,6 +37,13 @@ def render(a):
         step=times[0]['step'] if times else '—'
         t=f"{r['time_to_target_seconds']:.3f}" if r['target_reached'] else 'null (right-censored)'
         lines.append(f"| {r['method']} | {r['seed']} | {r['target_reached']} | {step} | {t} | {r['censor_seconds']:.3f} |")
+    lines.append('')
+    for m in ('lora','simplex'):
+        selected=[r for r in runs if r['method']==m]
+        reached=[r['time_to_target_seconds'] for r in selected if r['target_reached']]
+        timing=(f'{statistics.mean(reached):.3f} s' if reached else 'null')
+        if len(reached)>1: timing+=f' ± {statistics.stdev(reached):.3f} s (sample SD)'
+        lines.append(f"- {m}: reached {len(reached)}/{len(selected)}; right-censored {len(selected)-len(reached)}; reached-only mean {timing}.")
     lines += ['', 'Unreached times remain null; no zero substitution or mean over censored values.', '',
               '## Runtime and memory', '',
               'Step times synchronize CUDA and include probes/optimizer/rank changes, excluding',
