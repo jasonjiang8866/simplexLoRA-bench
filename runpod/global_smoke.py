@@ -19,6 +19,10 @@ from provider import (IMAGE, MIG, REPOSITORY, SOURCE, NoRedirect, Runpod,
 OUTPUT = Path("runpod-results")
 
 
+class PhaseDeadline(Exception):
+    """Never reinterpret a cancellation signal as a retryable HTTP timeout."""
+
+
 def save(name, value):
     OUTPUT.mkdir(exist_ok=True)
     path = OUTPUT / name
@@ -79,6 +83,8 @@ def cleanup(api):
         matches = [p for p in api.listing("/pods", "pods") if p.get("name") == meta["name"]]
         if len(matches) > 1:
             raise RuntimeError("Ambiguous Pod identity")
+        if not matches and meta.get("cleanup_confirmed"):
+            continue
         for pod in matches:
             mounts = pod.get("mounts") or {}
             if (pod.get("env", {}).get("SIMPLEX_MANAGED_BY") != REPOSITORY or
@@ -155,7 +161,7 @@ def launch_phase(api, config, phase, *, prior=None):
     save("provision-" + phase + ".json", meta)
 
     def cancelled(*_):
-        raise TimeoutError("Phase deadline or cancellation")
+        raise PhaseDeadline("Phase deadline or cancellation")
 
     previous = {s: signal.signal(s, cancelled) for s in (signal.SIGALRM, signal.SIGTERM, signal.SIGINT)}
     signal.alarm(max(1, int(deadline - time.time())))

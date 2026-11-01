@@ -111,6 +111,31 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(api.calls, [("/pods", "POST")])
         self.assertTrue((Path(self.tmp.name) / "provision-smoke.json").exists())
 
+    def test_signal_deadline_is_not_swallowed_as_http_timeout(self):
+        class Opener:
+            def open(self, *_args, **_kwargs):
+                raise controller.PhaseDeadline("cancelled")
+        with patch.object(provider.urllib.request, "build_opener", return_value=Opener()):
+            with self.assertRaises(controller.PhaseDeadline):
+                provider.request("https://api.runpod.io/v2/pods", token="test-only")
+
+    def test_http_client_has_explicit_identity(self):
+        seen = []
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                pass
+            def read(self, _):
+                return b'{}'
+        class Opener:
+            def open(self, req, **_):
+                seen.append(req)
+                return Response()
+        with patch.object(provider.urllib.request, "build_opener", return_value=Opener()):
+            provider.request("https://example.test/result", token="test-only")
+        self.assertEqual(seen[0].get_header("User-agent"), "simplexlora-bench-actions/0.1")
+
     def test_cleanup_retains_volume_and_unrelated_pods(self):
         meta = {**metadata(), "name": "simplex-123-1-smoke", "started_epoch": 1, "rate": .69}
         controller.save("provision-smoke.json", meta)
