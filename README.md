@@ -1,7 +1,7 @@
 # simplexLoRA-bench
 
 An isolated **8-bit frozen base + sequence-classification head** benchmark:
-standard LoRA **r=8** versus a paper-based SimplexLoRA implementation, with
+standard LoRA **r=8** versus a paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206) implementation, with
 three paired seeds and a RunPod launch path.
 
 This is an engineering experiment, not a reproduction of the paper's reported
@@ -90,3 +90,32 @@ adapter tensors, matching data/hardware/software, and completed rank search.
 
 See [RunPod instructions](runpod/README.md), [method decisions](docs/METHOD.md)
 and [validation record](docs/VALIDATION.md).
+
+### Original paper and citation
+
+This benchmark's SimplexLoRA implementation is based on:
+
+Igor Shalygin, Grigorii Davydenko, Andrey Veprikov, Aleksey Antonov,
+Nikolay Bushkov, Stanislav Moiseev, and Aleksandr Beznosikov (2026).
+**SimplexLoRA: Dynamic Rank Updating via Alternating Minimization with Simplex Projection.**
+
+- [Paper on arXiv](https://arxiv.org/abs/2610.37206) ([v1 used for this implementation](https://arxiv.org/html/2610.37206v1)).
+- [Published version: Findings of EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.2409/).
+- [Authors' official implementation](https://github.com/brain-lab-research/SimplexLoRA).
+
+BibTeX for the arXiv version (author names follow arXiv metadata):
+
+```bibtex
+@misc{shalygin2026simplexlora,
+  title = {{SimplexLoRA}: Dynamic Rank Updating via Alternating Minimization with Simplex Projection},
+  author = {Igor Shalygin and Grigorii Davydenko and Andrey Veprikov and Aleksey Antonov and Nikolay Bushkov and Stanislav Moiseev and Aleksandr Beznosikov},
+  year = {2026},
+  eprint = {2610.37206},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  url = {https://arxiv.org/abs/2610.37206}
+}
+```
+
+Implementation choices and differences from the authors' code are documented
+in [method decisions](docs/METHOD.md).
