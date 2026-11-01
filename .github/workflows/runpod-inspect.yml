@@ -1,0 +1,24 @@
+name: Inspect managed RunPod compute
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['runpod/inspect_managed.py', '.github/workflows/runpod-inspect.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    if: github.repository == 'jasonjiang8866/simplexLoRA-bench'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read only this repository's Pod status and bounded logs
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: python runpod/inspect_managed.py
