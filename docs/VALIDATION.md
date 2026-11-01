@@ -8,16 +8,17 @@
 
 See [preflight evidence](results/gradient-diagnosis-preflight.md). New probes,
 29 CPU tests, 16 lifecycle tests, CPU PEFT gates, image publication and read-only
-RunPod dry-run passed. Paid GPU diagnosis awaits budget approval; the six full
-500-step benchmark runs remain pending.
+RunPod dry-run passed. At this preparation checkpoint paid GPU diagnosis still
+awaited budget approval; it subsequently completed as recorded above. This
+entry records preparation evidence only, not full-benchmark completion.
 
 
 ## RunPod CUDA smoke — 2026-11-01
 
 See the [GPU smoke and Global Volume record](results/runpod-smoke-41324992190.md)
 for the immutable image, Actions runs, CUDA/int8 gate, six eight-step runs,
-cross-region persistence evidence and compute cleanup. The full performance
-benchmark remains pending. All 48 steps were inspected: zero nonfinite/missing
+cross-region persistence evidence and compute cleanup. At that checkpoint the
+full performance benchmark was pending. All 48 steps were inspected: zero nonfinite/missing
 gradient events, but 46 pre-clipping norm >100 flags; this is not a clean
 training-stability result.
 

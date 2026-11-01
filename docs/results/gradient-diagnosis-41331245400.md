@@ -35,6 +35,13 @@ The head-gradient observer reconstructs
 Agreement with autograd, stable hidden-feature norms and declining mean losses
 support the feature/head-scale explanation. It also verifies last-nonpadding
 pooling against the attention mask, reconstructed logits and batch-mean CE.
+The initial head standard deviation near 0.02 multiplied by hidden-vector
+norm near 290 implies an approximately 5.8 logit standard deviation under
+independent random head entries. Observed first-batch logit standard deviations
+are 4.534, 6.460 and 4.142 for seeds 17/42/123, with losses 4.472, 9.048 and
+4.927. This explains large initial CE/head derivatives without a sum-reduced
+loss or padding error. It is a configuration-scale diagnosis, not evidence that
+this initialization and joint clipping are optimal for rank-search learning.
 All live optimizer parameters are checked after each step. Rank updates retained
 the classifier optimizer state and removed replaced adapter state. A-gradient
 zeros when B is initialized to zero remain expected diagnostics.
@@ -43,6 +50,17 @@ Mean loss in the first versus final ten steps decreased in all six runs:
 LoRA seeds 17/42/123: 3.345→1.293, 8.364→1.277, 5.722→1.427;
 Simplex: 3.362→2.656, 8.535→4.669, 5.786→3.467.
 These 50-step values do not establish final method superiority.
+
+Post-hoc inspection of every rank-update window (steps 9–11, 19–21, 29–31)
+also found the expected reset signature: adapter A-gradient norm becomes zero
+at steps 11/21/31 for every Simplex seed after B is reinitialized to zero,
+while B still receives a finite gradient. For example, seed 17 at steps 10→11
+has A norm 0.03977→0, B norm 3.27535→3.62210 and head norm 80.1047→119.8193.
+The other seeds show the same reset signature. Those head/loss changes are
+across different batches and are not an isolated causal estimate of resizing.
+The analyzer now preserves all nine surrounding records per Simplex run,
+including optimizer inventories and before/after ranks, in
+`rank_transition_windows` when re-run on the retained raw archive.
 
 ## Rank-search limitation to carry into interpretation
 

@@ -4,7 +4,12 @@ The implementation provides both **start inside a Pod** and **create a Pod
 from your machine**. No account credentials are embedded. The Actions path
 also supports bounded smoke runs and independent Global Volume restore checks.
 
-## Published image (2026-11-01)
+For the diagnosed/full-matrix path, use the **new immutable image and explicit
+dispatch inputs** in [the current experiment section](#current-formal-dispatch).
+The original smoke image below remains historical evidence and is still used
+by the separate legacy smoke workflow.
+
+## Historical first published image (2026-11-01)
 
 The first image was published by the existing manual
 [Publish RunPod image run](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41320152026)
@@ -52,8 +57,9 @@ checks. This publication reused the cached build layer containing those steps;
 it did not freshly execute those checks. **A successful image build is not a
 CUDA/int8 compatibility result or a GPU benchmark result.** The subsequent
 [2026-11-01 smoke record](../docs/results/runpod-smoke-41324992190.md) documents
-actual GPU execution and Global Volume persistence. The full 500-step
-performance benchmark remains pending.
+actual GPU execution and Global Volume persistence. That historical release
+did not complete the full 500-step performance benchmark; the current formal
+dispatch is recorded separately below.
 
 ## 1. Build and publish another revision
 
@@ -66,7 +72,7 @@ RunPod console if using a private image.
 Alternatively, build/push locally:
 
 ```bash
-docker build -f runpod/Dockerfile -t ghcr.io/jasonjiang8866/simplexlora-bench:experiment .
+docker build --build-arg SOURCE_SHA="$(git rev-parse HEAD)" -f runpod/Dockerfile -t ghcr.io/jasonjiang8866/simplexlora-bench:experiment .
 docker push ghcr.io/jasonjiang8866/simplexlora-bench:experiment
 docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/jasonjiang8866/simplexlora-bench:experiment
 ```
@@ -250,7 +256,10 @@ not imply that incomplete local Pod data survives deletion.
 Analyze downloaded step evidence with:
 
 ```bash
-python runpod/analyze_gradients.py smoke-evidence.tar --output gradients.json
+python runpod/report_experiment.py smoke-evidence.tar --output analysis.json
+python runpod/render_report.py analysis.json --output tables.md
+# Optional local analysis dependency: matplotlib (validated with 3.10.8).
+python runpod/plot_experiment.py analysis.json --output curves.svg
 ```
 
 The archive retains the historical filename `smoke-evidence.tar` because it
@@ -265,7 +274,39 @@ resolved config and each run's step count distinguish the actual experiment.
 - [Image publication](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330245339): success; 29 CPU tests and the CPU PEFT gate executed inside the new image build.
 - The public registry tag and computed OCI index hash match the digest above;
   downloaded `image.txt` agrees. The historical smoke image is unchanged.
-- [Experiment dry-run](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330661456): success. `diagnostic`, 45 GPU minutes, $0.65 proposed compute cap, $0.641667 ceiling including cleanup reserve. **No paid dispatch has occurred.**
+- [Experiment dry-run](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330661456): success. `diagnostic`, 45 GPU minutes, $0.65 proposed compute cap, $0.641667 ceiling including cleanup reserve. This preparation run created no compute.
 - [Inventory check](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41330478365): zero managed Pods. Preflight reported zero account Pods, MIG $0.69/h with EUR-IS-2/US-PA-1/US-WA-1 availability, CPU cpu3c AP-JP-1 $0.06/h, and the expected Global Volume.
 
 The user subsequently approved a total $10 session budget. [Diagnostic run 41331245400](../docs/results/gradient-diagnosis-41331245400.md) completed successfully, including independent CPU restoration and confirmed cleanup, at estimated compute cost $0.12654. The planned full run uses the same image, a 75-minute GPU deadline and $1 compute cap; its result remains pending.
+
+### Current formal dispatch
+
+The formal read-only [dry-run 41333320173](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41333320173)
+passed with zero account Pods, MIG $0.69/h and cpu3c $0.06/h. Paid formal
+[run 41333468131](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41333468131)
+was dispatched with these exact inputs (new deployments must recheck inventory):
+
+| Input | Value |
+|---|---|
+| mode | `benchmark` |
+| image | `ghcr.io/jasonjiang8866/simplexlora-bench@sha256:2d630d23e069ed5b486520dbd303c3c35a7cc8c56ec79d269c710819adf7fa08` |
+| image_source_sha | `b5d40812c9ba7eb1a8ef8c28d4b9e0e262367753` |
+| gpu_minutes | `75` |
+| max_compute_usd | `1` |
+| confirm_paid_experiment | `true` (`false` for read-only dry-run) |
+| diagnosis_review_run | `41333037273` (review publication run, not the diagnostic run ID) |
+| restore_from_run | empty for a new matrix |
+
+The controller checks out the image's exact source commit even when main has
+later analysis/documentation commits. This prevents a moving main from changing
+the training or controller during six paired runs. The source/image mismatch
+checks are not relaxed for later report-only changes.
+
+For CPU-only recovery of this completed matrix, use the same inputs with
+`restore_from_run=41333468131`; no replacement GPU is created. Recovery requires
+the retained original Actions artifact and confirmed original GPU deletion.
+Do not rerun the whole paid job merely to retry a failed CPU restoration.
+
+Both `provision-*.json` files must show `cleanup_confirmed: true`. After the job,
+run **Inspect managed RunPod compute** to independently verify that managed Pod
+count is zero. Preserve the Global Volume and unrelated resources.

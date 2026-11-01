@@ -77,7 +77,12 @@ def report(archive):
                 'evaluations': json.loads(read(key + '/evaluations.json')),
                 'head_initial': provenance[key]['head_initial'],
                 'provenance': provenance[key],
-                'rank_history': ranks})
+                'rank_history': ranks,
+                'rank_transition_windows': [
+                    {k: row[k] for k in ('step', 'loss', 'lr', 'seconds', 'rank_update',
+                                        'gradients', 'optimizer', 'ranks_before', 'ranks_after')}
+                    for row in rows
+                    if any(abs(row['step'] - event['step']) <= 1 for event in ranks)]})
         paired = []
         for seed in (17, 42, 123):
             a, b = [steps[f'{m}-{seed}'] for m in ('lora', 'simplex')]
