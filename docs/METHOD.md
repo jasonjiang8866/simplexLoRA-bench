@@ -55,7 +55,11 @@ are outside this initial experiment.
 Primary sources reviewed:
 - [Liu et al., ICML 2024, sections 4.1–4.3](https://arxiv.org/html/2402.09353v2).
 - [Authors' implementation and PEFT guidance](https://github.com/NVlabs/DoRA), inspected revision
-  `7e2f10abbe8efe212c8fca1d983ae1d04ef13a18`.
+  `7e2f10abbe8efe212c8fca1d983ae1d04ef13a18`, particularly
+  [`commonsense_reasoning/peft/src/peft/tuners/dora.py`](https://github.com/NVlabs/DoRA/blob/7e2f10abbe8efe212c8fca1d983ae1d04ef13a18/commonsense_reasoning/peft/src/peft/tuners/dora.py).
+  Its `dora_simple` path detaches the norm; its legacy int8 DoRA class raises
+  `NotImplementedError`. This benchmark uses the maintained PEFT 0.17.1 int8
+  implementation instead of that historical fork.
 - Pinned PEFT 0.17.1: [int8 dispatch](https://github.com/huggingface/peft/blob/v0.17.1/src/peft/tuners/lora/bnb.py),
   [DoRA variant](https://github.com/huggingface/peft/blob/v0.17.1/src/peft/tuners/lora/variants.py),
   [magnitude and detached norm](https://github.com/huggingface/peft/blob/v0.17.1/src/peft/tuners/lora/dora.py),

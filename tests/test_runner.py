@@ -74,6 +74,22 @@ def test_nine_run_strict_matrix_and_missing_dora(tmp_path, monkeypatch):
     assert len(summary["runs"]) == 9
     assert len(summary["paired"]) == 3
     assert all("test_f1_delta_dora_minus_simplex" in p for p in summary["paired"])
+    # Exercise the three-method raw-archive analyzer and report, without GPU claims.
+    import importlib.util, tarfile
+    spec = importlib.util.spec_from_file_location("reports", Path(__file__).parents[1] / "runpod/report_experiment.py")
+    reports = importlib.util.module_from_spec(spec); spec.loader.exec_module(reports)
+    spec = importlib.util.spec_from_file_location("render", Path(__file__).parents[1] / "runpod/render_report.py")
+    renderer = importlib.util.module_from_spec(spec); spec.loader.exec_module(renderer)
+    atomic_json(tmp_path / "compatibility.json", {"status": "passed", "device": "cpu", "bits": 32})
+    archive = tmp_path.parent / "fixture.tar"
+    with tarfile.open(archive, 'w') as tar:
+        for path in tmp_path.rglob('*'):
+            if path.is_file(): tar.add(path, arcname=str(path.relative_to(tmp_path)))
+    analysis = reports.report(archive)
+    assert analysis['checks']['complete_matrix']
+    assert not analysis['checks']['cuda_int8_gate_passed']
+    assert len(analysis['paired_f1_delta_summaries']) == 3
+    assert 'DoRA − Simplex' in renderer.render(analysis)
     dora = tmp_path / "dora-17"
     checkpoint = dora / "adapter/adapter_model.safetensors"
     weights = load_file(checkpoint)

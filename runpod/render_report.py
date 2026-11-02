@@ -8,6 +8,7 @@ import statistics
 def render(a):
     runs = a['runs']
     methods = list(a['aggregates'])
+    steps = a['manifest']['config']['steps']
     def pm(key, method, scale=1, digits=4):
         xs = [r[key] / scale for r in runs if r['method'] == method]
         return f'{statistics.mean(xs):.{digits}f} ± {statistics.stdev(xs):.{digits}f}'
@@ -80,7 +81,7 @@ def render(a):
             lines.append(f"| {r['seed']} | {h['step']} | {h['total_rank']} / 192 | {counts} | {h['adapter_parameters']} / {h['budget']} |")
     lines += ['', 'LoRA remains r=8 at all 24 q_proj layers. The classifier has 3584 parameters.',
               'Floor rounding leaves unused adapter capacity; rank search and resets are charged',
-              'to the same 500-step budget. The JSON preserves all layer-specific ranks and weights.', '']
+              f'to the same {steps}-step budget. The JSON preserves all layer-specific ranks and weights.', '']
     if 'dora' in methods:
         lines += ['## DoRA paired comparisons', '', '| Seed | DoRA − LoRA | Simplex − LoRA | DoRA − Simplex |', '|---|---:|---:|---:|']
         for pair in a['paired_f1']:
@@ -93,7 +94,7 @@ def render(a):
         for r in runs:
             m = r.get('magnitude_final') or {}
             lines.append(f"| {r['method']} | {r['seed']} | {r['initial_trainable_parameters']} | {r['final_trainable_parameters']} | {m.get('numel', 0)} | {r['optimizer_final']['state_bytes']} | {m.get('delta_l2', 0):.6g} / {m.get('delta_abs_max', 0):.6g} |")
-        lines += ['', 'Magnitude initial/final values, group gradients and per-step changes are retained in raw evidence.', '']
+        lines += ['', 'Simplex also trains one external SGD importance scalar per adapted layer during search (count is in each rank-history weights list); these are outside AdamW/model parameter totals. Magnitude initial/final values, group gradients and per-step changes are retained in raw evidence.', '']
     return '\n'.join(lines)
 
 

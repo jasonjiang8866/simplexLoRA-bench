@@ -99,7 +99,9 @@ def report(archive):
                     'initial_norm_delta': b[0]['gradients']['norm'] - a[0]['gradients']['norm']})
         checks = {
             'sealed_run_artifacts_verified': True,
-            'cuda_int8_gate_passed': compatibility['status'] == 'passed' and compatibility['device'] == 'cuda' and compatibility['bits'] == 8,
+            'cuda_int8_gate_passed': compatibility['status'] == 'passed' and compatibility['device'] == 'cuda' and compatibility['bits'] == 8 and all(
+                all(compatibility.get('methods', {}).get(m, {}).get(k) is True
+                    for k in ('forward_backward', 'frozen_base', 'save_reload')) for m in methods),
             'complete_matrix': len(runs) == len(methods) * len(seeds) and {(r['method'],r['seed']) for r in runs} == {(m,s) for m in methods for s in seeds},
             'paired_batches_and_initial_heads': all(p['all_batch_hashes_equal'] and p['initial_head_hash_equal'] for p in paired),
             'finite_present_gradients': all(r['gradient_summary']['missing_steps'] == r['gradient_summary']['nonfinite_steps'] == 0 for r in runs),
