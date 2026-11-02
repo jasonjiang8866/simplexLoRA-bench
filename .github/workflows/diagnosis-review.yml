@@ -16,9 +16,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Normalize review artifact filename
+        env:
+          REVIEW_SOURCE: ${{ inputs.experiment == 'dora' && 'docs/results/dora-diagnosis-review.json' || 'docs/results/diagnosis-review.json' }}
+        run: |
+          mkdir -p review-artifact
+          cp "$REVIEW_SOURCE" review-artifact/diagnosis-review.json
       - uses: actions/upload-artifact@v4
         with:
           name: diagnosis-review
-          path: ${{ inputs.experiment == 'dora' && 'docs/results/dora-diagnosis-review.json' || 'docs/results/diagnosis-review.json' }}
+          path: review-artifact/diagnosis-review.json
           if-no-files-found: error
           retention-days: 90

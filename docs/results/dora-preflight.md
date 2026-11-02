@@ -69,14 +69,21 @@ passed at 2026-11-02T03:55:05Z with `confirm_paid_experiment=false`:
   `78b25f2be5e6689b20e96f24dc5c3277a113a7474626a8d1667990e7963b2ed5`.
   Both preflight artifacts have 90-day retention.
 
-Proposed current-session compute authorization: $2.25 total ($0.65 diagnosis,
-$1.60 formal). These are deadline-based caps, **not measured duration estimates**.
+The user approved **$4.50 current-session compute budget** on 2026-11-02.
+Initial phase caps remain $0.65 diagnosis and $1.60 formal, rather than spending
+the entire authorization. These are deadline-based caps, **not measured duration estimates**.
 After diagnosis passes, forecast nine full runs and CPU restoration from measured
 timings and choose a tighter formal deadline within this cap. Stop if the diagnostic
 fails or the forecast exceeds it. Storage/request fees are additional; existing
-volume retention remains unchanged. No paid authorization has yet been received.
+volume retention remains unchanged.
 
-Pending: explicit current-session budget allocation, actual CUDA/int8 gate,
+The first paid diagnosis was dispatched as
+[41396288500](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41396288500)
+with the verified image/source above, a 45-minute GPU deadline and $0.65 phase cap.
+Its preflight rechecked inventory and prices; GPU Pod `7wkwevfzvy0v82` was allocated
+in US-PA-1 at $0.69/hour. This dispatch record is not a passing diagnosis result.
+
+Pending: actual CUDA/int8 gate,
 GPU diagnosis and measured formal duration forecast, reviewed decision,
 nine × 500 formal runs, CPU restoration, raw results, costs and cleanup.
 No historical $10 allocation was treated as open-ended current authorization.
