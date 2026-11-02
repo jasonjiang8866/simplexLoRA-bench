@@ -7,6 +7,15 @@ and exact saved trainable tensors reloaded with zero output difference in all
 nine diagnostic runs. This evidence applies to the pinned image/hardware/config;
 it is not a claim of universal PEFT or quantization compatibility.
 
+The [subsequent formal batch](results/dora-benchmark-41399541318.md) completed
+nine independent 500-step runs on one GPU with the same immutable image.
+All 4,500 steps passed missing/nonfinite-gradient checks, all checkpoint outputs
+reloaded identically, and a fresh CPU in another region restored the complete
+archive after GPU deletion. DoRA's extra 21,504 magnitude parameters and measured
+optimizer/memory/runtime costs are reported explicitly. The three-seed accuracy
+differences are descriptive; the joint-clipping/near-unit Simplex importance
+limitation below remains unchanged.
+
 Primary references:
 
 - [Paper, section 3.1 and appendix B](https://arxiv.org/html/2610.37206v1)

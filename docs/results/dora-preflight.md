@@ -2,8 +2,9 @@
 
 Preparation record: implementation, CPU/Docker CI, image publication and both
 read-only dry-runs passed. Subsequently, [paid CUDA diagnosis and recovery](dora-diagnosis-41396288500.md)
-passed. The formal nine-run benchmark remains pending; no method-superiority
-conclusion follows from the diagnostic.
+passed, followed by the [complete nine-run formal benchmark and CPU recovery](dora-benchmark-41399541318.md).
+This file preserves the preparation decisions; measured results and final cleanup
+are in the linked reports. No method-superiority conclusion follows from the diagnostic.
 
 - Starting main: `2dd9fec21320f5cc6017634002068ed26e786d4c`; no open PRs.
 - Latest historical CI: [41337362698](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41337362698), successful.
@@ -86,5 +87,8 @@ in US-PA-1 at $0.69/hour. This dispatch record is not a passing diagnosis result
 
 Completed since this preparation: CUDA/int8 gate, GPU diagnosis, independent
 CPU restoration, measured formal forecast, reviewed decision and diagnostic cleanup.
-Pending: nine × 500 formal runs, their independent CPU restoration and final report.
+Subsequently completed: nine × 500 formal runs, independent CPU restoration,
+final report and independent zero-managed-Pod inspection. Actual session compute
+estimate was $0.828779. The post-diagnosis forecast reduced the formal deadline
+to 90 GPU minutes and the phase cap to $1.20; see the measured report above.
 No historical $10 allocation was treated as open-ended current authorization.

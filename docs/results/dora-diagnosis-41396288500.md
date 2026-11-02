@@ -37,17 +37,16 @@ evaluated once at the final budget; no best-validation checkpoint selection.
 
 | Method | Validation macro-F1 | Test macro-F1 |
 |---|---:|---:|
-| lora | 0.6388 ± 0.0350 | 0.6197 ± 0.0452 |
-| simplex | 0.3181 ± 0.1111 | 0.2985 ± 0.1092 |
-| dora | 0.6356 ± 0.0334 | 0.6194 ± 0.0479 |
+| lora | 0.6387603384 ± 0.0349982915 | 0.6196643759 ± 0.0452288134 |
+| simplex | 0.3181366474 ± 0.1111207628 | 0.2985406953 ± 0.1092182260 |
+| dora | 0.6355728510 ± 0.0333965501 | 0.6194121765 ± 0.0478854515 |
 
-| Seed | LoRA test F1 | Simplex test F1 | Simplex − LoRA |
+| Seed | LoRA test F1 | Simplex test F1 | DoRA test F1 |
 |---|---:|---:|---:|
-| 17 | 0.670674 | 0.411320 | -0.259354 |
-| 42 | 0.603861 | 0.193271 | -0.410590 |
-| 123 | 0.584457 | 0.291031 | -0.293427 |
+| 17 | 0.6706743854 | 0.4113201088 | 0.6734119762 |
+| 42 | 0.6038614204 | 0.1932713016 | 0.6027094940 |
+| 123 | 0.5844573219 | 0.2910306754 | 0.5821150593 |
 
-Paired difference mean ± sample SD: **-0.321124 ± 0.079331** (F1 units).
 Three seeds do not establish a general significance or method superiority claim.
 
 ## Time-to-target and censoring
@@ -79,8 +78,10 @@ Unreached times remain null; no zero substitution or mean over censored values.
 ## Runtime and memory
 
 Step times synchronize CUDA and include probes/optimizer/rank changes, excluding
-validation. Steady median excludes startup/search; P95 below is per-run P95.
-Peak memory includes the loaded model, training and evaluation; reserved memory
+validation. DoRA magnitude telemetry is included; these are instrumented benchmark
+times, not isolated adapter-kernel timings. Steady median excludes startup/search; P95 below is per-run P95.
+Peak memory includes the loaded model, training and evaluation, but excludes
+the subsequent fresh-model checkpoint-reload verification; reserved memory
 is allocator reservation, not additional tensor memory.
 
 | Method | Step mean (ms) | Steady median (ms) | Per-run P95 (ms) | Peak allocated (GiB) | Peak reserved (GiB) |
@@ -118,6 +119,26 @@ Expected zero A gradients when B is zero are not treated as missing gradients.
 | simplex | 123 | 39/50 | 0 / 0 | 76.487–281.133 | 99.8789% | 1.000000133 |
 | dora | 123 | 26/50 | 0 / 0 | 45.489–270.622 | 99.6816% | 1.000000126 |
 
+Mean pre-clip group norm across all steps and seeds; — means the group is absent.
+
+| Method | Head | Adapter A | Adapter B | Magnitude | Importance |
+|---|---:|---:|---:|---:|---:|
+| lora | 124.425 | 0.581994 | 4.39825 | — | — |
+| simplex | 167.868 | 0.138542 | 3.99487 | — | 0.00135726 |
+| dora | 124.197 | 0.575897 | 4.39464 | 1.38133 | — |
+
+| Method | Seed | Clip coefficient min / max | Loss first / last 10 mean | Maximum absolute logit | Mean hidden norm |
+|---|---:|---:|---:|---:|---:|
+| lora | 17 | 0.00364664 / 0.0256774 | 3.344858 / 1.292685 | 14.859892 | 297.708 |
+| simplex | 17 | 0.00366584 / 0.0151442 | 3.362377 / 2.656366 | 17.216198 | 297.222 |
+| dora | 17 | 0.003657 / 0.0240395 | 3.356246 / 1.311496 | 14.977373 | 297.770 |
+| lora | 42 | 0.00351565 / 0.0249974 | 8.364431 / 1.277238 | 15.602596 | 294.191 |
+| simplex | 42 | 0.00304566 / 0.0106893 | 8.535201 / 4.668594 | 15.602596 | 295.259 |
+| dora | 42 | 0.0035059 / 0.0254587 | 8.286735 / 1.321891 | 15.602596 | 294.014 |
+| lora | 123 | 0.00362622 / 0.0232831 | 5.722373 / 1.426925 | 15.792219 | 296.786 |
+| simplex | 123 | 0.00355703 / 0.0130741 | 5.785565 / 3.466577 | 16.720814 | 296.321 |
+| dora | 123 | 0.0036952 / 0.0219833 | 5.699808 / 1.455396 | 16.253754 | 296.843 |
+
 Largest analytic head-gradient relative error: 1.887e-07.
 Group norms (head, A, B, magnitude, importance, other), clipping coefficients, losses,
 hidden/logit scales, all pairing checks and full rank weights are retained in JSON.
@@ -144,18 +165,21 @@ to the same 50-step budget. The JSON preserves all layer-specific ranks and weig
 
 | Seed | DoRA − LoRA | Simplex − LoRA | DoRA − Simplex |
 |---|---:|---:|---:|
-| 17 | +0.002738 | -0.259354 | +0.262092 |
-| 42 | -0.001152 | -0.410590 | +0.409438 |
-| 123 | -0.002342 | -0.293427 | +0.291084 |
-test_f1_delta_simplex_minus_lora: -0.321124 ± 0.079331 (sample SD).
-test_f1_delta_dora_minus_lora: -0.000252 ± 0.002657 (sample SD).
-test_f1_delta_dora_minus_simplex: +0.320871 ± 0.078059 (sample SD).
+| 17 | +0.0027375908 | -0.2593542766 | +0.2620918674 |
+| 42 | -0.0011519263 | -0.4105901188 | +0.4094381924 |
+| 123 | -0.0023422626 | -0.2934266465 | +0.2910843838 |
+
+| Paired difference | Mean ± sample SD |
+|---|---:|
+| DoRA − LoRA | -0.0002521994 ± 0.0026567573 |
+| Simplex − LoRA | -0.3211236806 ± 0.0793310422 |
+| DoRA − Simplex | +0.3208714812 ± 0.0780588768 |
 
 ## Parameter and optimizer overhead
 
 Same initial rank does not mean equal parameter count. Optimizer bytes are tensor storage, not allocator reservation.
 
-| Method | Seed | Initial trainable | Final trainable | Magnitude parameters | Optimizer state bytes | Magnitude Δ L2 / max |
+| Method | Seed | Initial model trainable | Final model trainable | Magnitude parameters | Optimizer state bytes | Magnitude Δ L2 / max |
 |---|---:|---:|---:|---:|---:|---:|
 | lora | 17 | 347648 | 347648 | 0 | 2781380 | 0 / 0 |
 | simplex | 17 | 347648 | 327936 | 0 | 2623684 | 0 / 0 |
@@ -167,5 +191,5 @@ Same initial rank does not mean equal parameter count. Optimizer bytes are tenso
 | simplex | 123 | 347648 | 324352 | 0 | 2595012 | 0 / 0 |
 | dora | 123 | 369152 | 369152 | 21504 | 2953508 | 0.206308 / 0.00541446 |
 
-Simplex also trains one external SGD importance scalar per adapted layer during search (count is in each rank-history weights list); these are outside AdamW/model parameter totals. Magnitude initial/final values, group gradients and per-step changes are retained in raw evidence.
+Simplex also trains 24 external SGD importance scalars during search, hence 347672 initial trainable scalars including importance. These are outside AdamW/model parameter totals and become frozen after search. Its manual SGD update has no momentum state. Magnitude initial/final values, group gradients and per-step changes are retained in raw evidence.
 

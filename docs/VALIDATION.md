@@ -80,4 +80,26 @@ trainable tensor reload with zero logit difference, frozen-base checks and
 optimizer coverage/state checks. No missing/nonfinite gradients in 450 steps.
 DoRA magnitude updated in every seed. A fresh AP-JP-1 CPU restored all 170 files
 from the US-PA-1 GPU export and reproduced the summary; both Pods were deleted.
-The 500-step formal three-method benchmark is a separate pending milestone.
+The [formal three-method benchmark 41399541318](results/dora-benchmark-41399541318.md)
+then completed all nine independent 500-step runs on one US-PA-1 GPU with the
+same image. All 4,500 steps had zero missing/nonfinite gradients, with unchanged
+base weights, complete optimizer coverage/state, and zero checkpoint logit error.
+DoRA magnitude changed in every seed. Original norm>100 warnings remain:
+LoRA 141/1500, Simplex 206/1500, DoRA 134/1500; clip max_norm stays 1.0.
+All three methods reached validation F1 0.85 in 3/3 runs, with no censoring.
+
+After confirmed GPU deletion, a fresh EU-CZ-1 CPU restored 170 files and the
+identical summary. Independent local verification checked every file hash,
+checkpoint shape and byte-identical summary regeneration. Payload 163,209,130
+bytes and archive 163,522,560 bytes remain within limits; Actions ZIP is
+53,273,092 bytes with 90-day retention. Both Pods were confirmed deleted;
+[final independent inspection 41406335557](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41406335557)
+reported `managed_pod_count: 0` at 2026-11-02T07:26:45Z.
+Formal compute estimate is $0.626519; diagnosis plus formal $0.828779 against
+the approved $4.50, with storage/request charges additional.
+
+New LoRA/Simplex runs reproduce all six historical test scores, while their
+timings remain separate measurements. Historical archives are retained, not
+reclassified as three-method results. CPU tests, Docker build/publication,
+CUDA/int8 gate, diagnosis, formal benchmark and recovery are distinct evidence;
+none by itself establishes statistical method superiority.

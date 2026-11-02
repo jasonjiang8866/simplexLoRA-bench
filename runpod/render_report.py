@@ -18,13 +18,20 @@ def render(a):
         'evaluated once at the final budget; no best-validation checkpoint selection.', '',
         '| Method | Validation macro-F1 | Test macro-F1 |', '|---|---:|---:|']
     for method in methods:
-        lines.append(f"| {method} | {pm('validation_macro_f1', method)} | {pm('test_macro_f1', method)} |")
-    lines += ['', '| Seed | LoRA test F1 | Simplex test F1 | Simplex − LoRA |', '|---|---:|---:|---:|']
-    for pair in a['paired_f1']:
-        x,y = [next(r for r in runs if r['method'] == m and r['seed'] == pair['seed']) for m in ('lora','simplex')]
-        lines.append(f"| {pair['seed']} | {x['test_macro_f1']:.6f} | {y['test_macro_f1']:.6f} | {y['test_macro_f1']-x['test_macro_f1']:+.6f} |")
-    d=a['paired_f1_delta_summary']
-    lines += ['', f"Paired difference mean ± sample SD: **{d['mean']:+.6f} ± {d['std']:.6f}** (F1 units).",
+        lines.append(f"| {method} | {pm('validation_macro_f1', method, digits=10)} | {pm('test_macro_f1', method, digits=10)} |")
+    if 'dora' in methods:
+        lines += ['', '| Seed | LoRA test F1 | Simplex test F1 | DoRA test F1 |', '|---|---:|---:|---:|']
+        for pair in a['paired_f1']:
+            values = [next(r['test_macro_f1'] for r in runs if r['method'] == m and r['seed'] == pair['seed']) for m in ('lora', 'simplex', 'dora')]
+            lines.append(f"| {pair['seed']} | " + ' | '.join(f'{v:.10f}' for v in values) + ' |')
+    else:
+        lines += ['', '| Seed | LoRA test F1 | Simplex test F1 | Simplex − LoRA |', '|---|---:|---:|---:|']
+        for pair in a['paired_f1']:
+            x,y = [next(r for r in runs if r['method'] == m and r['seed'] == pair['seed']) for m in ('lora','simplex')]
+            lines.append(f"| {pair['seed']} | {x['test_macro_f1']:.6f} | {y['test_macro_f1']:.6f} | {y['test_macro_f1']-x['test_macro_f1']:+.6f} |")
+        d=a['paired_f1_delta_summary']
+        lines += ['', f"Paired difference mean ± sample SD: **{d['mean']:+.6f} ± {d['std']:.6f}** (F1 units)."]
+    lines += ['',
               'Three seeds do not establish a general significance or method superiority claim.', '',
               '## Time-to-target and censoring', '',
               'Target: validation macro-F1 ≥ 0.85 at evaluations every 25 steps.',
@@ -49,8 +56,10 @@ def render(a):
     lines += ['', 'Unreached times remain null; no zero substitution or mean over censored values.', '',
               '## Runtime and memory', '',
               'Step times synchronize CUDA and include probes/optimizer/rank changes, excluding',
-              'validation. Steady median excludes startup/search; P95 below is per-run P95.',
-              'Peak memory includes the loaded model, training and evaluation; reserved memory',
+              'validation. DoRA magnitude telemetry is included; these are instrumented benchmark',
+              'times, not isolated adapter-kernel timings. Steady median excludes startup/search; P95 below is per-run P95.',
+              'Peak memory includes the loaded model, training and evaluation, but excludes',
+              'the subsequent fresh-model checkpoint-reload verification; reserved memory',
               'is allocator reservation, not additional tensor memory.', '',
               '| Method | Step mean (ms) | Steady median (ms) | Per-run P95 (ms) | Peak allocated (GiB) | Peak reserved (GiB) |',
               '|---|---:|---:|---:|---:|---:|']
@@ -68,6 +77,20 @@ def render(a):
         g=r['gradient_summary']; n=g['pre_clip_norm']
         lines.append(f"| {r['method']} | {r['seed']} | {g['spike_steps']}/{r['steps']} | {g['missing_steps']} / {g['nonfinite_steps']} | {n['min']:.3f}–{n['max']:.3f} | {100*g['head_squared_norm_fraction']['mean']:.4f}% | {g['post_clip_norm']['max']:.9f} |")
     err=max(r['observations']['head_gradient_relative_error_max'] for r in runs)
+    if 'dora' in methods:
+        lines += ['', 'Mean pre-clip group norm across all steps and seeds; — means the group is absent.', '',
+                  '| Method | Head | Adapter A | Adapter B | Magnitude | Importance |', '|---|---:|---:|---:|---:|---:|']
+        for m in methods:
+            selected = [r for r in runs if r['method'] == m]
+            values = []
+            for group in ('head', 'adapter_A', 'adapter_B', 'magnitude', 'importance'):
+                absent = (group == 'magnitude' and m != 'dora') or (group == 'importance' and m != 'simplex')
+                values.append('—' if absent else f"{statistics.mean(r['gradient_summary']['group_norms'][group]['mean'] for r in selected):.6g}")
+            lines.append('| ' + m + ' | ' + ' | '.join(values) + ' |')
+        lines += ['', '| Method | Seed | Clip coefficient min / max | Loss first / last 10 mean | Maximum absolute logit | Mean hidden norm |', '|---|---:|---:|---:|---:|---:|']
+        for r in runs:
+            c = r['gradient_summary']['clip_coefficient']; o = r['observations']
+            lines.append(f"| {r['method']} | {r['seed']} | {c['min']:.6g} / {c['max']:.6g} | {o['loss_first_10_mean']:.6f} / {o['loss_last_10_mean']:.6f} | {o['logit_abs_max']:.6f} | {o['hidden_norm']['mean']:.3f} |")
     lines += ['', f'Largest analytic head-gradient relative error: {err:.3e}.',
               'Group norms (head, A, B, magnitude, importance, other), clipping coefficients, losses,',
               'hidden/logit scales, all pairing checks and full rank weights are retained in JSON.', '',
@@ -85,16 +108,20 @@ def render(a):
     if 'dora' in methods:
         lines += ['## DoRA paired comparisons', '', '| Seed | DoRA − LoRA | Simplex − LoRA | DoRA − Simplex |', '|---|---:|---:|---:|']
         for pair in a['paired_f1']:
-            lines.append(f"| {pair['seed']} | {pair['test_f1_delta_dora_minus_lora']:+.6f} | {pair['test_f1_delta_simplex_minus_lora']:+.6f} | {pair['test_f1_delta_dora_minus_simplex']:+.6f} |")
-        for key, d in a['paired_f1_delta_summaries'].items():
-            lines.append(f"{key}: {d['mean']:+.6f} ± {d['std']:.6f} (sample SD).")
+            lines.append(f"| {pair['seed']} | {pair['test_f1_delta_dora_minus_lora']:+.10f} | {pair['test_f1_delta_simplex_minus_lora']:+.10f} | {pair['test_f1_delta_dora_minus_simplex']:+.10f} |")
+        lines += ['', '| Paired difference | Mean ± sample SD |', '|---|---:|']
+        for key, label in [('test_f1_delta_dora_minus_lora', 'DoRA − LoRA'), ('test_f1_delta_simplex_minus_lora', 'Simplex − LoRA'), ('test_f1_delta_dora_minus_simplex', 'DoRA − Simplex')]:
+            d = a['paired_f1_delta_summaries'][key]
+            lines.append(f"| {label} | {d['mean']:+.10f} ± {d['std']:.10f} |")
         lines += ['', '## Parameter and optimizer overhead', '',
                   'Same initial rank does not mean equal parameter count. Optimizer bytes are tensor storage, not allocator reservation.', '',
-                  '| Method | Seed | Initial trainable | Final trainable | Magnitude parameters | Optimizer state bytes | Magnitude Δ L2 / max |', '|---|---:|---:|---:|---:|---:|---:|']
+                  '| Method | Seed | Initial model trainable | Final model trainable | Magnitude parameters | Optimizer state bytes | Magnitude Δ L2 / max |', '|---|---:|---:|---:|---:|---:|---:|']
         for r in runs:
             m = r.get('magnitude_final') or {}
             lines.append(f"| {r['method']} | {r['seed']} | {r['initial_trainable_parameters']} | {r['final_trainable_parameters']} | {m.get('numel', 0)} | {r['optimizer_final']['state_bytes']} | {m.get('delta_l2', 0):.6g} / {m.get('delta_abs_max', 0):.6g} |")
-        lines += ['', 'Simplex also trains one external SGD importance scalar per adapted layer during search (count is in each rank-history weights list); these are outside AdamW/model parameter totals. Magnitude initial/final values, group gradients and per-step changes are retained in raw evidence.', '']
+        simplex_run = next(r for r in runs if r['method'] == 'simplex')
+        importance_count = len(simplex_run['rank_history'][0]['weights']) if simplex_run['rank_history'] else 0
+        lines += ['', f"Simplex also trains {importance_count} external SGD importance scalars during search, hence {simplex_run['initial_trainable_parameters'] + importance_count} initial trainable scalars including importance. These are outside AdamW/model parameter totals and become frozen after search. Its manual SGD update has no momentum state. Magnitude initial/final values, group gradients and per-step changes are retained in raw evidence.", '']
     return '\n'.join(lines)
 
 
