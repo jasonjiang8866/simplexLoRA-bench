@@ -4,8 +4,8 @@ An isolated **8-bit frozen base + sequence-classification head** benchmark:
 standard LoRA **r=8**, paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206),
 and PEFT [DoRA](https://arxiv.org/abs/2402.09353), with three paired seeds.
 
-**DoRA extension status:** implementation and offline tests are available; the
-new CUDA/int8 diagnosis and nine-run GPU benchmark are **pending**. See the
+**DoRA extension status:** the real CUDA/int8 gate and [nine-run 50-step diagnosis](docs/results/dora-diagnosis-41396288500.md), including cross-region CPU recovery, have passed. The
+new nine-run 500-step GPU benchmark is **pending**. See the
 [DoRA validation record](docs/results/dora-preflight.md). Equal initial rank is
 not equal parameter count: DoRA adds a magnitude vector per adapted projection.
 

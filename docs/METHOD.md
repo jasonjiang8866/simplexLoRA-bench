@@ -1,5 +1,12 @@
 # Method and compatibility decisions
 
+The [2026-11-02 three-method GPU diagnosis](results/dora-diagnosis-41396288500.md)
+verified the pinned PEFT 0.17.1 DoRA path on Qwen2.5 sequence classification,
+bitsandbytes int8 frozen base, q_proj and trainable score head. Magnitude updated
+and exact saved trainable tensors reloaded with zero output difference in all
+nine diagnostic runs. This evidence applies to the pinned image/hardware/config;
+it is not a claim of universal PEFT or quantization compatibility.
+
 Primary references:
 
 - [Paper, section 3.1 and appendix B](https://arxiv.org/html/2610.37206v1)

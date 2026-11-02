@@ -69,7 +69,7 @@ def render(a):
         lines.append(f"| {r['method']} | {r['seed']} | {g['spike_steps']}/{r['steps']} | {g['missing_steps']} / {g['nonfinite_steps']} | {n['min']:.3f}–{n['max']:.3f} | {100*g['head_squared_norm_fraction']['mean']:.4f}% | {g['post_clip_norm']['max']:.9f} |")
     err=max(r['observations']['head_gradient_relative_error_max'] for r in runs)
     lines += ['', f'Largest analytic head-gradient relative error: {err:.3e}.',
-              'Group norms (head, A, B, importance, other), clipping coefficients, losses,',
+              'Group norms (head, A, B, magnitude, importance, other), clipping coefficients, losses,',
               'hidden/logit scales, all pairing checks and full rank weights are retained in JSON.', '',
               '## Rank allocation', '',
               '| Seed | Step | Total rank / 192 | Layer rank counts | Adapter parameters / 344064 |',

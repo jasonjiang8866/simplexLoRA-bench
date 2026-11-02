@@ -73,3 +73,11 @@ was made during development.
 See [DoRA preparation and status](results/dora-preflight.md). CPU integration,
 Docker publication, CUDA/int8 gate, GPU diagnosis and nine-run performance are
 separate milestones. Historical six-run results above are not DoRA results.
+
+The [three-method diagnostic 41396288500](results/dora-diagnosis-41396288500.md)
+passed the real Qwen2 CUDA/int8 gate, nine Qwen2.5 runs × 50 steps, exact
+trainable tensor reload with zero logit difference, frozen-base checks and
+optimizer coverage/state checks. No missing/nonfinite gradients in 450 steps.
+DoRA magnitude updated in every seed. A fresh AP-JP-1 CPU restored all 170 files
+from the US-PA-1 GPU export and reproduced the summary; both Pods were deleted.
+The 500-step formal three-method benchmark is a separate pending milestone.

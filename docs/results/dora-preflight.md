@@ -1,8 +1,9 @@
 # DoRA extension preparation — 2026-11-02 SGT
 
-Status: implementation, CPU/Docker CI, image publication and both read-only
-dry-run passed. Paid CUDA validation remains pending. No DoRA GPU
-results or method-superiority conclusions exist at this preparation checkpoint.
+Preparation record: implementation, CPU/Docker CI, image publication and both
+read-only dry-runs passed. Subsequently, [paid CUDA diagnosis and recovery](dora-diagnosis-41396288500.md)
+passed. The formal nine-run benchmark remains pending; no method-superiority
+conclusion follows from the diagnostic.
 
 - Starting main: `2dd9fec21320f5cc6017634002068ed26e786d4c`; no open PRs.
 - Latest historical CI: [41337362698](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41337362698), successful.
@@ -83,7 +84,7 @@ with the verified image/source above, a 45-minute GPU deadline and $0.65 phase c
 Its preflight rechecked inventory and prices; GPU Pod `7wkwevfzvy0v82` was allocated
 in US-PA-1 at $0.69/hour. This dispatch record is not a passing diagnosis result.
 
-Pending: actual CUDA/int8 gate,
-GPU diagnosis and measured formal duration forecast, reviewed decision,
-nine × 500 formal runs, CPU restoration, raw results, costs and cleanup.
+Completed since this preparation: CUDA/int8 gate, GPU diagnosis, independent
+CPU restoration, measured formal forecast, reviewed decision and diagnostic cleanup.
+Pending: nine × 500 formal runs, their independent CPU restoration and final report.
 No historical $10 allocation was treated as open-ended current authorization.

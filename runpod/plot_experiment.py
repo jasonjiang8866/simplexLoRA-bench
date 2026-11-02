@@ -39,9 +39,48 @@ def plot(analysis, output):
     plt.close(fig)
 
 
+def plot_adaptation(analysis, output):
+    """Separate measured DoRA updates from Simplex search and rank rounding."""
+    styles = {17: '-', 42: '--', 123: ':'}
+    fig, axes = plt.subplots(1, 3, figsize=(12, 3.6))
+    for run in analysis['runs']:
+        style = styles[run['seed']]
+        label = f"seed {run['seed']}"
+        if run['method'] == 'dora':
+            rows = run['magnitude_trajectory']
+            axes[0].plot([0] + [r['step'] for r in rows],
+                         [0] + [r['delta_abs_max'] for r in rows],
+                         color='#16836b', linestyle=style, label=label)
+        elif run['method'] == 'simplex':
+            rows = run['rank_history']
+            axes[1].plot([0] + [r['step'] for r in rows],
+                         [0] + [max(abs(w - 1) for w in r['weights']) for r in rows],
+                         color='#cc6519', linestyle=style, marker='o', label=label)
+            initial = analysis['manifest']['config']['rank'] * len(rows[0]['ranks'])
+            axes[2].step([0] + [r['step'] for r in rows] + [analysis['manifest']['config']['steps']],
+                         [initial] + [sum(r['ranks'].values()) for r in rows] + [sum(rows[-1]['ranks'].values())],
+                         where='post', color='#cc6519', linestyle=style, label=label)
+    labels = [('DoRA magnitude update', 'max |m(step) − m(initial)|'),
+              ('Simplex importance at search events', 'max |importance − 1|'),
+              ('Simplex allocated rank', 'Sum of layer ranks')]
+    for ax, (title, ylabel) in zip(axes, labels):
+        ax.set(title=title, xlabel='Optimizer step', ylabel=ylabel)
+        ax.grid(alpha=.2)
+        ax.spines[['top', 'right']].set_visible(False)
+        ax.legend(fontsize=8)
+    fig.suptitle('Measured adaptation diagnostics — separate scales, three paired seeds')
+    fig.tight_layout()
+    fig.savefig(output, metadata={'Date': None}, bbox_inches='tight')
+    plt.close(fig)
+
+
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('analysis')
     p.add_argument('--output', required=True)
+    p.add_argument('--adaptation-output', help='Optional magnitude/importance/rank figure')
     a = p.parse_args()
-    plot(json.loads(Path(a.analysis).read_text()), a.output)
+    analysis = json.loads(Path(a.analysis).read_text())
+    plot(analysis, a.output)
+    if a.adaptation_output:
+        plot_adaptation(analysis, a.adaptation_output)
