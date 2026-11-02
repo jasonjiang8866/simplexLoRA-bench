@@ -47,17 +47,26 @@ def validate_result(result, phase, meta, profile=None):
     gate = r.get("compatibility", {})
     if (gate.get("status"), gate.get("device"), gate.get("bits")) != ("passed", "cuda", 8):
         raise ValueError("Missing CUDA/int8 evidence")
-    for method in ("lora", "simplex"):
+    methods = profile.get("methods", profile.get("config", {}).get("methods", ["lora", "simplex"]))
+    for method in methods:
         if any(gate.get("methods", {}).get(method, {}).get(k) is not True
                for k in ("forward_backward", "frozen_base", "save_reload")):
             raise ValueError("Missing real PEFT checks")
+    if "dora" in methods:
+        dora = gate["methods"]["dora"]
+        if gate.get("model_type") != "qwen2" or dora.get("optimizer_coverage") is not True or not dora.get("reload", {}).get("magnitude_verified"):
+            raise ValueError("Missing Qwen2 DoRA checks")
     runs = r.get("summary", {}).get("runs", [])
-    if len(runs) != 6 or {(x.get("method"), x.get("seed")) for x in runs} != {
-            (m, s) for m in ("lora", "simplex") for s in (17, 42, 123)}:
+    if len(runs) != 3 * len(methods) or {(x.get("method"), x.get("seed")) for x in runs} != {
+            (m, s) for m in methods for s in (17, 42, 123)}:
         raise ValueError("Incomplete matrix")
     for run in runs:
         if run.get("status") != "passed" or run.get("steps") != profile["steps"] or run.get("quantized_linear_count", 0) <= 0:
             raise ValueError("Invalid smoke run")
+        if "dora" in methods and (run.get("checkpoint_reload", {}).get("passed") is not True or
+                (run["method"] == "dora" and (not run["checkpoint_reload"].get("magnitude_verified") or
+                 run.get("magnitude_final", {}).get("delta_l2", 0) <= 0))):
+            raise ValueError("Missing trained checkpoint reload")
         for key in ("test_macro_f1", "validation_macro_f1"):
             if not finite(run.get(key)) or run[key] > 1:
                 raise ValueError("Invalid F1")

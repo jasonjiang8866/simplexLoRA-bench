@@ -7,6 +7,7 @@ import statistics
 
 def render(a):
     runs = a['runs']
+    methods = list(a['aggregates'])
     def pm(key, method, scale=1, digits=4):
         xs = [r[key] / scale for r in runs if r['method'] == method]
         return f'{statistics.mean(xs):.{digits}f} ± {statistics.stdev(xs):.{digits}f}'
@@ -15,7 +16,7 @@ def render(a):
         'Mean ± sample standard deviation across three paired seeds. Test data is',
         'evaluated once at the final budget; no best-validation checkpoint selection.', '',
         '| Method | Validation macro-F1 | Test macro-F1 |', '|---|---:|---:|']
-    for method in ('lora', 'simplex'):
+    for method in methods:
         lines.append(f"| {method} | {pm('validation_macro_f1', method)} | {pm('test_macro_f1', method)} |")
     lines += ['', '| Seed | LoRA test F1 | Simplex test F1 | Simplex − LoRA |', '|---|---:|---:|---:|']
     for pair in a['paired_f1']:
@@ -38,7 +39,7 @@ def render(a):
         t=f"{r['time_to_target_seconds']:.3f}" if r['target_reached'] else 'null (right-censored)'
         lines.append(f"| {r['method']} | {r['seed']} | {r['target_reached']} | {step} | {t} | {r['censor_seconds']:.3f} |")
     lines.append('')
-    for m in ('lora','simplex'):
+    for m in methods:
         selected=[r for r in runs if r['method']==m]
         reached=[r['time_to_target_seconds'] for r in selected if r['target_reached']]
         timing=(f'{statistics.mean(reached):.3f} s' if reached else 'null')
@@ -52,7 +53,7 @@ def render(a):
               'is allocator reservation, not additional tensor memory.', '',
               '| Method | Step mean (ms) | Steady median (ms) | Per-run P95 (ms) | Peak allocated (GiB) | Peak reserved (GiB) |',
               '|---|---:|---:|---:|---:|---:|']
-    for m in ('lora','simplex'):
+    for m in methods:
         lines.append(f"| {m} | {pm('step_seconds_mean',m,.001,3)} | {pm('steady_step_seconds_median',m,.001,3)} | {pm('step_seconds_p95',m,.001,3)} | {pm('peak_allocated_bytes',m,2**30,4)} | {pm('peak_reserved_bytes',m,2**30,4)} |")
     lines += ['', '| Method | Seed | Training + validation (s) | Setup (s) | Final trainable parameters |', '|---|---:|---:|---:|---:|']
     for r in runs:
@@ -80,6 +81,19 @@ def render(a):
     lines += ['', 'LoRA remains r=8 at all 24 q_proj layers. The classifier has 3584 parameters.',
               'Floor rounding leaves unused adapter capacity; rank search and resets are charged',
               'to the same 500-step budget. The JSON preserves all layer-specific ranks and weights.', '']
+    if 'dora' in methods:
+        lines += ['## DoRA paired comparisons', '', '| Seed | DoRA − LoRA | Simplex − LoRA | DoRA − Simplex |', '|---|---:|---:|---:|']
+        for pair in a['paired_f1']:
+            lines.append(f"| {pair['seed']} | {pair['test_f1_delta_dora_minus_lora']:+.6f} | {pair['test_f1_delta_simplex_minus_lora']:+.6f} | {pair['test_f1_delta_dora_minus_simplex']:+.6f} |")
+        for key, d in a['paired_f1_delta_summaries'].items():
+            lines.append(f"{key}: {d['mean']:+.6f} ± {d['std']:.6f} (sample SD).")
+        lines += ['', '## Parameter and optimizer overhead', '',
+                  'Same initial rank does not mean equal parameter count. Optimizer bytes are tensor storage, not allocator reservation.', '',
+                  '| Method | Seed | Initial trainable | Final trainable | Magnitude parameters | Optimizer state bytes | Magnitude Δ L2 / max |', '|---|---:|---:|---:|---:|---:|---:|']
+        for r in runs:
+            m = r.get('magnitude_final') or {}
+            lines.append(f"| {r['method']} | {r['seed']} | {r['initial_trainable_parameters']} | {r['final_trainable_parameters']} | {m.get('numel', 0)} | {r['optimizer_final']['state_bytes']} | {m.get('delta_l2', 0):.6g} / {m.get('delta_abs_max', 0):.6g} |")
+        lines += ['', 'Magnitude initial/final values, group gradients and per-step changes are retained in raw evidence.', '']
     return '\n'.join(lines)
 
 

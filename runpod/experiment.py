@@ -16,13 +16,13 @@ from provider import Runpod, budget, finite, identity, preflight
 
 
 def plan(mode, image, source_sha, gpu_minutes, max_cost):
-    if mode not in {"diagnostic", "benchmark"}:
+    if mode not in {"diagnostic", "benchmark", "diagnostic-dora", "benchmark-dora"}:
         raise ValueError("Invalid experiment mode")
     if not re.fullmatch(r"ghcr.io/jasonjiang8866/simplexlora-bench@sha256:[a-f0-9]{64}", image):
         raise ValueError("An immutable repository image is required")
     if not re.fullmatch(r"[a-f0-9]{40}", source_sha):
         raise ValueError("Image source commit is required")
-    limit = 45 if mode == "diagnostic" else 180
+    limit = 45 if mode.startswith("diagnostic") else 180
     if isinstance(gpu_minutes, bool) or not 15 <= gpu_minutes <= limit:
         raise ValueError("GPU deadline outside bounded profile")
     # Reserve 5m cleanup per phase beyond the training/polling deadline.
@@ -33,6 +33,7 @@ def plan(mode, image, source_sha, gpu_minutes, max_cost):
     from simplexbench.cli import source_identity
     config = json.loads((Path(__file__).resolve().parents[1] / 'configs' / f'{mode}.json').read_text())
     return {"mode": mode, "steps": config['steps'], "image": image,
+            "methods": config.get("methods", ["lora", "simplex"]), "expected_runs": 3 * len(config.get("methods", ["lora", "simplex"])),
             "source": source_identity(), "image_source_sha": source_sha,
             "gpu_seconds": gpu_minutes * 60, "cpu_seconds": 900,
             "max_bytes": 1024**3, "max_compute_usd": max_cost,
@@ -43,7 +44,11 @@ def plan(mode, image, source_sha, gpu_minutes, max_cost):
 def verify_prior(directory, profile, config):
     meta = json.loads((directory / 'provision-smoke.json').read_text())
     result = json.loads((directory / 'result-smoke.json').read_text())
-    if meta.get('profile') != profile or meta.get('cleanup_confirmed') is not True:
+    prior_profile = dict(meta.get('profile', {}))
+    for key in ('methods', 'expected_runs'):
+        if key not in prior_profile and 'dora' not in profile.get('methods', []):
+            prior_profile[key] = profile[key]
+    if prior_profile != profile or meta.get('cleanup_confirmed') is not True:
         raise ValueError('Prior profile or GPU cleanup mismatch')
     if meta['volume_id'] != config['global_volume']['id']:
         raise ValueError('Prior volume mismatch')
@@ -80,12 +85,16 @@ def main():
         return
     if os.environ.get('CONFIRM_PAID_EXPERIMENT') != 'true':
         raise ValueError('Explicit paid dispatch required')
-    if profile['mode'] == 'benchmark':
+    if profile['mode'].startswith('benchmark') and args.action != 'restore':
         # Written only after reviewing diagnostic evidence; must match this image.
         review = json.loads(Path('diagnosis-review.json').read_text())
         if (review.get('decision') != 'proceed' or review.get('image') != profile['image'] or
                 review.get('source_hash') != profile['source'] or not review.get('diagnostic_run')):
             raise ValueError('Missing reviewed diagnosis for this image/source')
+    if profile['mode'] == 'benchmark-dora' and args.action != 'restore':
+        if (review.get('methods') != profile['methods'] or review.get('completed_runs') != 9 or
+                review.get('diagnostic_steps') != 50):
+            raise ValueError('Nine-run DoRA diagnosis review required')
     if args.action == 'restore':
         first = verify_prior(Path('restore-input'), profile, config)
         lifecycle.save('result-smoke.json', {'status': 'passed', 'report': first['report']})
@@ -100,7 +109,7 @@ def main():
         'reader_region': restored['data_center'], 'cross_pod_restore_verified': True,
         'snapshot_sha256': first['report']['snapshot_sha256'],
         'file_count': first['report']['file_count'],
-        'performance_benchmark': profile['mode'] == 'benchmark'})
+        'performance_benchmark': profile['mode'].startswith('benchmark')})
 
 
 if __name__ == '__main__':

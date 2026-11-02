@@ -9,9 +9,9 @@ import sys
 import time
 from pathlib import Path
 
-from .common import atomic_json, digest, file_hash, validate_config
+from .common import atomic_json, digest, file_hash, validate_config, methods_for, execution_order
 
-METHODS = ("lora", "simplex")
+METHODS = ("lora", "simplex", "dora")
 
 
 def read_manifest(path):
@@ -19,6 +19,8 @@ def read_manifest(path):
     if manifest["id"] != digest({k: v for k, v in manifest.items() if k != "id"}):
         raise ValueError("Manifest checksum mismatch")
     validate_config(manifest["config"])
+    if manifest["config"].get("evidence_version") == 2 and manifest.get("execution_order") != execution_order(manifest["config"]):
+        raise ValueError("Missing/invalid balanced execution order")
     return manifest
 
 
@@ -31,8 +33,11 @@ def verify_run(directory, manifest, method, seed):
         if status.get(key) != expected:
             raise ValueError(f"Run identity mismatch: {key}")
     artifacts = status.get("artifacts", {})
+    strict = manifest["config"].get("evidence_version") == 2
     required = {"result.json", "provenance.json", "steps.jsonl", "evaluations.json", "ranks.json",
                 "anomalies.json", "adapter/adapter_config.json", "adapter/adapter_model.safetensors"}
+    if strict:
+        required.add("reload.json")
     if not required <= artifacts.keys():
         raise ValueError("Missing required artifacts")
     for relative, expected in artifacts.items():
@@ -65,16 +70,38 @@ def verify_run(directory, manifest, method, seed):
         raise ValueError("Inconsistent target result")
     if result["target_reached"] and not 0 <= result["time_to_target_seconds"] <= result["censor_seconds"]:
         raise ValueError("Invalid time-to-target")
+    if strict:
+        reload = json.loads((directory / "reload.json").read_text())
+        if reload != result.get("checkpoint_reload") or reload.get("passed") is not True or reload.get("head_verified") is not True:
+            raise ValueError("Missing checkpoint output/head reload evidence")
+        if reload.get("frozen_base_unchanged") is not True:
+            raise ValueError("Missing frozen-base equality evidence")
+        if method == "dora" and (reload.get("magnitude_verified") is not True or
+                result.get("magnitude_final", {}).get("delta_l2", 0) <= 0):
+            raise ValueError("Missing DoRA update/reload evidence")
+        for row in rows:
+            g = row["gradients"]
+            if g["missing"] or g["nonfinite"] or g["post_clip"]["norm"] > 1.00001:
+                raise ValueError("Invalid gradient evidence")
+            if method == "dora" and (row.get("magnitude") is None or "magnitude" not in g["group_norms"]):
+                raise ValueError("Missing magnitude telemetry")
     from safetensors import safe_open
     with safe_open(directory / "adapter/adapter_model.safetensors", framework="pt") as weights:
         keys = list(weights.keys())
         if not any("lora_A" in k for k in keys) or not any("score" in k for k in keys):
             raise ValueError("Adapter/classifier checkpoint incomplete")
+        config = json.loads((directory / "adapter/adapter_config.json").read_text())
+        if bool(config.get("use_dora")) != (method == "dora"):
+            raise ValueError("Checkpoint method mismatch")
         for key in keys:
             if "lora_A" in key:
                 bkey = key.replace("lora_A", "lora_B")
                 if bkey not in keys or weights.get_slice(key).get_shape()[0] != weights.get_slice(bkey).get_shape()[1]:
                     raise ValueError("Invalid adapter shapes")
+                if method == "dora":
+                    mkey = key.replace("lora_A.weight", "lora_magnitude_vector")
+                    if mkey not in keys or weights.get_slice(mkey).get_shape() != [weights.get_slice(bkey).get_shape()[0]]:
+                        raise ValueError("DoRA magnitude checkpoint incomplete")
     return result
 
 
@@ -91,19 +118,29 @@ def summarize(output):
 def _summarize(output):
     output = Path(output)
     manifest = read_manifest(output / "manifest.json")
+    methods = methods_for(manifest["config"])
     results = [verify_run(output / f"{method}-{seed}", manifest, method, seed)
-               for seed in manifest["config"]["seeds"] for method in METHODS]
+               for seed in manifest["config"]["seeds"] for method in methods]
     if len({digest(r["data_hashes"]) for r in results}) != 1:
         raise ValueError("Data differs between runs")
     provenances = [json.loads((output / f"{r['method']}-{r['seed']}" / "provenance.json").read_text())
                    for r in results]
     if len({digest({k: p[k] for k in ("packages", "gpu", "cuda")}) for p in provenances}) != 1:
         raise ValueError("Hardware/software differs between runs")
+    if manifest["config"].get("evidence_version") == 2:
+        for seed in manifest["config"]["seeds"]:
+            paths = [output / f"{m}-{seed}" for m in methods]
+            batch_hashes = [[json.loads(line)["observations"]["batch_sha256"] for line in (p / "steps.jsonl").read_text().splitlines()] for p in paths]
+            heads = [json.loads((p / "provenance.json").read_text())["head_initial"]["sha256"] for p in paths]
+            if any(b != batch_hashes[0] for b in batch_hashes) or len(set(heads)) != 1:
+                raise ValueError("Unpaired batches or initial classifier heads")
     summary = {"manifest_id": manifest["id"], "runs": results, "aggregates": {}, "paired": []}
     metrics = ("validation_macro_f1", "test_macro_f1", "step_seconds_mean",
                "steady_step_seconds_median", "peak_allocated_bytes", "peak_reserved_bytes",
                "gradient_anomaly_steps")
-    for method in METHODS:
+    if manifest["config"].get("evidence_version") == 2:
+        metrics += ("step_seconds_p95", "initial_trainable_parameters", "final_trainable_parameters")
+    for method in methods:
         rows = [r for r in results if r["method"] == method]
         group = {}
         for key in metrics:
@@ -113,13 +150,23 @@ def _summarize(output):
         times = [r["time_to_target_seconds"] for r in rows if r["target_reached"]]
         group["time_to_target"] = {"reached": len(times), "total": len(rows),
                                    "reached_only_mean_seconds": statistics.mean(times) if times else None}
+        if manifest["config"].get("evidence_version") == 2:
+            group["time_to_target"].update(right_censored=len(rows)-len(times),
+                reached_only_std_seconds=statistics.stdev(times) if len(times)>1 else None,
+                censor_times_seconds=[r["censor_seconds"] for r in rows if not r["target_reached"]])
         summary["aggregates"][method] = group
     for seed in manifest["config"]["seeds"]:
-        a, b = [next(r for r in results if r["method"] == m and r["seed"] == seed) for m in METHODS]
+        a, b = [next(r for r in results if r["method"] == m and r["seed"] == seed) for m in ("lora", "simplex")]
         summary["paired"].append({"seed": seed, "test_f1_delta_simplex_minus_lora":
                                    b["test_macro_f1"] - a["test_macro_f1"]})
+    if "dora" in methods:
+        for pair in summary["paired"]:
+            values = {r["method"]: r["test_macro_f1"] for r in results if r["seed"] == pair["seed"]}
+            pair.update(test_f1_delta_dora_minus_lora=values["dora"] - values["lora"],
+                        test_f1_delta_dora_minus_simplex=values["dora"] - values["simplex"])
+        summary["execution_order"] = manifest["execution_order"]
     atomic_json(output / "summary.json", summary)
-    lines = ["# LoRA r=8 vs SimplexLoRA", "",
+    lines = ["# " + " vs ".join(methods) if "dora" in methods else "# LoRA r=8 vs SimplexLoRA", "",
              "Three paired seeds; mean ± sample standard deviation. No significance claim.",
              "Time-to-target includes rank search and validation, excludes loading/tokenization; unreached runs are censored.",
              "", "| Method | Test macro-F1 | Step mean (s) | Peak allocated GiB | Target reached |",
@@ -179,30 +226,31 @@ def _matrix(args):
     else:
         manifest = {"requested_config": c, "config": resolve(c), "source_hash": source_identity(),
                     "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        if c.get("evidence_version") == 2:
+            manifest["execution_order"] = execution_order(c)
         manifest["id"] = digest(manifest)
         atomic_json(manifest_path, manifest)
     atomic_json(output / "status.json", {"status": "running", "manifest_id": manifest["id"]})
-    # Fail before six paid experiments if the actual quantized adapter path is broken.
+    # Fail before paid matrix workers if the actual quantized adapter path is broken.
     try:
         subprocess.run([sys.executable, "-m", "simplexbench.compat", "--cuda",
                         "--output", str(output / "compatibility.json")], check=True)
-        for i, seed in enumerate(c["seeds"]):
-            # Alternate ordering to reduce systematic thermal/cache ordering bias.
-            for method in (METHODS if i % 2 == 0 else METHODS[::-1]):
-                directory = output / f"{method}-{seed}"
-                if directory.exists():
-                    try:
-                        verify_run(directory, manifest, method, seed)
-                        continue
-                    except (ValueError, KeyError, OSError):
-                        # Retain failed evidence; restart this run from step zero.
-                        archive = output / "incomplete"
-                        archive.mkdir(exist_ok=True)
-                        directory.rename(archive / f"{directory.name}-{time.time_ns()}")
-                subprocess.run([sys.executable, "-m", "simplexbench.cli", "worker",
-                                "--manifest", str(manifest_path), "--method", method,
-                                "--seed", str(seed), "--output", str(directory)], check=True)
-                verify_run(directory, manifest, method, seed)
+        for item in execution_order(c):
+            method, seed = item["method"], item["seed"]
+            directory = output / f"{method}-{seed}"
+            if directory.exists():
+                try:
+                    verify_run(directory, manifest, method, seed)
+                    continue
+                except (ValueError, KeyError, OSError):
+                    # Retain failed evidence; restart this run from step zero.
+                    archive = output / "incomplete"
+                    archive.mkdir(exist_ok=True)
+                    directory.rename(archive / f"{directory.name}-{time.time_ns()}")
+            subprocess.run([sys.executable, "-m", "simplexbench.cli", "worker",
+                            "--manifest", str(manifest_path), "--method", method,
+                            "--seed", str(seed), "--output", str(directory)], check=True)
+            verify_run(directory, manifest, method, seed)
         summarize(output)
     except BaseException as exc:
         atomic_json(output / "status.json", {"status": "failed", "error": str(exc)})
@@ -232,7 +280,7 @@ def main():
         from .runner import train
         manifest = read_manifest(args.manifest)
         validate_config(manifest["config"])
-        if args.seed not in manifest["config"]["seeds"]:
+        if args.seed not in manifest["config"]["seeds"] or args.method not in methods_for(manifest["config"]):
             raise ValueError("Seed not in manifest")
         train(manifest["config"], args.method, args.seed, args.output, manifest["id"])
 

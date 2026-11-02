@@ -7,6 +7,7 @@ RUN printf '%s\n' "$SOURCE_SHA" > /opt/source-sha.txt
 RUN python -m venv --system-site-packages /opt/bench-venv && \
     /opt/bench-venv/bin/pip install --no-cache-dir ".[gpu,test]" && \
     /opt/bench-venv/bin/python -m pip check && \
+    /opt/bench-venv/bin/pip freeze > /opt/environment.txt && \
     /opt/bench-venv/bin/python -m pytest -q -m "not cuda" && \
     /opt/bench-venv/bin/python -m simplexbench.compat --output /opt/cpu-compatibility.json
 ENV PATH=/opt/bench-venv/bin:$PATH

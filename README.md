@@ -1,8 +1,23 @@
 # simplexLoRA-bench
 
 An isolated **8-bit frozen base + sequence-classification head** benchmark:
-standard LoRA **r=8** versus a paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206) implementation, with
-three paired seeds and a RunPod launch path.
+standard LoRA **r=8**, paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206),
+and PEFT [DoRA](https://arxiv.org/abs/2402.09353), with three paired seeds.
+
+**DoRA extension status:** implementation and offline tests are available; the
+new CUDA/int8 diagnosis and nine-run GPU benchmark are **pending**. See the
+[DoRA validation record](docs/results/dora-preflight.md). Equal initial rank is
+not equal parameter count: DoRA adds a magnitude vector per adapted projection.
+
+```bash
+simplex-bench matrix --config configs/diagnostic-dora.json --output outputs/dora-diagnosis
+simplex-bench matrix --config configs/benchmark-dora.json --output outputs/dora-benchmark
+```
+
+These profiles require nine independent runs (50 and 500 steps respectively),
+including a real Qwen2 CUDA/int8 gate and checkpoint output/magnitude/head reload.
+They preserve the original hyperparameters and use a balanced cyclic method order.
+The following completed results are the **historical two-method experiment**.
 
 The [full GPU benchmark](docs/results/benchmark-41333468131.md) is complete:
 six independent 500-step runs, real CUDA/int8 gate, verified cross-region
@@ -47,7 +62,7 @@ python -m simplexbench.compat --cuda --output compatibility-gpu.json
 ```
 
 CPU-only validation uses the PyTorch CPU index and `.[test]`; omit `--cuda`.
-It tests real PEFT, Transformers and randomly initialized local Llama weights,
+It tests real PEFT, Transformers and randomly initialized local Qwen2 weights,
 without downloading a model. It does **not** validate bitsandbytes GPU kernels.
 The CUDA gate constructs, saves and loads a tiny local model in actual int8,
 then checks backward, rank changes, frozen-base integrity and adapter reload.
@@ -79,7 +94,7 @@ modules must have equal per-rank costs. Private/gated repositories use a local
 Each run writes `steps.jsonl`, `evaluations.json`, `anomalies.json`,
 `ranks.json`, `provenance.json`, `result.json` and a reloadable PEFT
 adapter **including the classifier**. The status file seals artifact hashes.
-The summary requires all six runs, contiguous steps, final evaluations, valid
+The summary requires every method/seed declared in the manifest, contiguous steps, final evaluations, valid
 adapter tensors, matching data/hardware/software, and completed rank search.
 
 - Report mean ± sample standard deviation and paired F1 deltas. Three seeds

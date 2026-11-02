@@ -20,6 +20,7 @@ jobs:
       - run: pip install ".[test]"
       - run: pip check
       - run: pytest -q -m "not cuda"
+      - run: python -m unittest discover -s runpod -p 'test_*.py' -v
       - run: python -m simplexbench.compat --output compatibility-cpu.json
       - uses: actions/upload-artifact@v4
         with:

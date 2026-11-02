@@ -32,6 +32,8 @@ def report(archive):
         summary = json.loads(read('summary.json'))
         compatibility = json.loads(read('compatibility.json'))
         expected = manifest['config']['steps']
+        methods = manifest['config'].get('methods', ['lora', 'simplex'])
+        seeds = manifest['config']['seeds']
         steps, provenance, runs = {}, {}, []
         for result in summary['runs']:
             key = f"{result['method']}-{result['seed']}"
@@ -78,25 +80,27 @@ def report(archive):
                 'head_initial': provenance[key]['head_initial'],
                 'provenance': provenance[key],
                 'rank_history': ranks,
+                'magnitude_trajectory': [{'step': r['step'], **r['magnitude']} for r in rows if r.get('magnitude')],
                 'rank_transition_windows': [
                     {k: row[k] for k in ('step', 'loss', 'lr', 'seconds', 'rank_update',
                                         'gradients', 'optimizer', 'ranks_before', 'ranks_after')}
                     for row in rows
                     if any(abs(row['step'] - event['step']) <= 1 for event in ranks)]})
         paired = []
-        for seed in (17, 42, 123):
-            a, b = [steps[f'{m}-{seed}'] for m in ('lora', 'simplex')]
-            if len(a) != len(b):
-                raise ValueError('Unpaired lengths')
-            paired.append({'seed': seed,
-                'all_batch_hashes_equal': all(x['observations']['batch_sha256'] == y['observations']['batch_sha256'] for x,y in zip(a,b)),
-                'initial_head_hash_equal': provenance[f'lora-{seed}']['head_initial']['sha256'] == provenance[f'simplex-{seed}']['head_initial']['sha256'],
-                'initial_loss_delta': b[0]['loss'] - a[0]['loss'],
-                'initial_norm_delta': b[0]['gradients']['norm'] - a[0]['gradients']['norm']})
+        for seed in seeds:
+            for left, right in [('lora', m) for m in methods if m != 'lora']:
+                a, b = [steps[f'{m}-{seed}'] for m in (left, right)]
+                if len(a) != len(b):
+                    raise ValueError('Unpaired lengths')
+                paired.append({'seed': seed, 'left': left, 'right': right,
+                    'all_batch_hashes_equal': all(x['observations']['batch_sha256'] == y['observations']['batch_sha256'] for x,y in zip(a,b)),
+                    'initial_head_hash_equal': provenance[f'{left}-{seed}']['head_initial']['sha256'] == provenance[f'{right}-{seed}']['head_initial']['sha256'],
+                    'initial_loss_delta': b[0]['loss'] - a[0]['loss'],
+                    'initial_norm_delta': b[0]['gradients']['norm'] - a[0]['gradients']['norm']})
         checks = {
             'sealed_run_artifacts_verified': True,
             'cuda_int8_gate_passed': compatibility['status'] == 'passed' and compatibility['device'] == 'cuda' and compatibility['bits'] == 8,
-            'six_runs': len(runs) == 6 and {(r['method'],r['seed']) for r in runs} == {(m,s) for m in ('lora','simplex') for s in (17,42,123)},
+            'complete_matrix': len(runs) == len(methods) * len(seeds) and {(r['method'],r['seed']) for r in runs} == {(m,s) for m in methods for s in seeds},
             'paired_batches_and_initial_heads': all(p['all_batch_hashes_equal'] and p['initial_head_hash_equal'] for p in paired),
             'finite_present_gradients': all(r['gradient_summary']['missing_steps'] == r['gradient_summary']['nonfinite_steps'] == 0 for r in runs),
             'clipping_verified': all(r['gradient_summary']['post_clip_norm']['max'] <= 1.00001 for r in runs),
@@ -106,7 +110,9 @@ def report(archive):
                 'manifest': manifest, 'compatibility': compatibility,
                 'checks': checks, 'runs': runs, 'paired_checks': paired,
                 'aggregates': summary['aggregates'], 'paired_f1': summary['paired'],
-                'paired_f1_delta_summary': describe(deltas)}
+                'paired_f1_delta_summary': describe(deltas),
+                'paired_f1_delta_summaries': {k: describe([p[k] for p in summary['paired']])
+                    for k in summary['paired'][0] if k.startswith('test_f1_delta_')}}
 
 
 def compare_prefix(baseline, completed):
@@ -116,8 +122,8 @@ def compare_prefix(baseline, completed):
         def read(tar, name):
             return tar.extractfile(name).read()
         configs = [json.loads(read(t, 'manifest.json')) for t in (old,new)]
-        for seed in (17,42,123):
-            for method in ('lora','simplex'):
+        for seed in configs[0]['config']['seeds']:
+            for method in configs[0]['config'].get('methods', ['lora', 'simplex']):
                 key=f'{method}-{seed}'
                 a,b = [[json.loads(line) for line in read(t,key+'/steps.jsonl').splitlines()] for t in (old,new)]
                 b=b[:len(a)]

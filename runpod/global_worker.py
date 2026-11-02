@@ -92,11 +92,14 @@ def validate_tree(root):
     gate = json.loads((root / "compatibility.json").read_text())
     if gate.get("status") != "passed" or gate.get("bits") != 8 or gate.get("device") != "cuda":
         raise ValueError("Missing real CUDA/int8 gate")
-    for method in ("lora", "simplex"):
+    manifest = json.loads((root / "manifest.json").read_text())
+    from simplexbench.common import methods_for
+    methods = methods_for(manifest["config"])
+    for method in methods:
         if any(gate["methods"][method].get(k) is not True for k in ("forward_backward", "frozen_base", "save_reload")):
             raise ValueError("Incomplete compatibility evidence")
     if {(r["method"], r["seed"]) for r in summary["runs"]} != {
-            (m, s) for m in ("lora", "simplex") for s in (17, 42, 123)} or len(summary["runs"]) != 6:
+            (m, s) for m in methods for s in (17, 42, 123)} or len(summary["runs"]) != 3 * len(methods):
         raise ValueError("Incomplete paired matrix")
     expected = json.loads((Path("/opt/bench/configs") / (MODE + ".json")).read_text())
     manifest = json.loads((root / "manifest.json").read_text())
@@ -124,7 +127,7 @@ def train(target, root, report):
     before = time.monotonic()
     copy_checked(probe, target / "probe.bin", spec(probe))
     report["probe"] = {**spec(probe), "write_and_readback_seconds": time.monotonic() - before}
-    RESULT["phase"] = "cuda-gate-and-six-smoke-workers"
+    RESULT["phase"] = "cuda-gate-and-configured-matrix"
     # Run the image's original entrypoint, preserving gate-before-workers ordering.
     run(["/bin/bash", "/opt/bench/runpod/start.sh"], LOCAL / "harness.log", int(os.environ.get("BENCH_TIMEOUT_SECONDS", "2300")) + 40)
     report["compatibility"], report["summary"] = validate_tree(root)

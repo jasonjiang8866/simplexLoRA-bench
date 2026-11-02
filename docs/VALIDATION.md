@@ -66,3 +66,10 @@ supersedes that status for the short smoke configuration only.
 The Dockerfile and GitHub workflow provide separate image-build validation;
 consult the PR checks for their current result. No RunPod API create request
 was made during development.
+
+
+## DoRA extension — 2026-11-02 SGT
+
+See [DoRA preparation and status](results/dora-preflight.md). CPU integration,
+Docker publication, CUDA/int8 gate, GPU diagnosis and nine-run performance are
+separate milestones. Historical six-run results above are not DoRA results.

@@ -1,6 +1,11 @@
 name: Publish reviewed gradient decision
 on:
   workflow_dispatch:
+    inputs:
+      experiment:
+        type: choice
+        options: [legacy, dora]
+        default: legacy
   push:
     branches: [main]
     paths: ['docs/results/diagnosis-review.json']
@@ -14,6 +19,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: diagnosis-review
-          path: docs/results/diagnosis-review.json
+          path: ${{ inputs.experiment == 'dora' && 'docs/results/dora-diagnosis-review.json' || 'docs/results/diagnosis-review.json' }}
           if-no-files-found: error
           retention-days: 90

@@ -315,3 +315,40 @@ Do not rerun the whole paid job merely to retry a failed CPU restoration.
 Both `provision-*.json` files must show `cleanup_confirmed: true`. After the job,
 run **Inspect managed RunPod compute** to independently verify that managed Pod
 count is zero. Preserve the Global Volume and unrelated resources.
+
+
+## Three-method DoRA profiles
+
+Select `diagnostic-dora` (nine × 50 prefix steps) or `benchmark-dora`
+(nine × 500 steps) in `RunPod gradient diagnosis and full benchmark`.
+The historical `diagnostic` / `benchmark` choices remain two-method profiles.
+Use the new image digest and exact source SHA from publication; the historical
+image cannot execute DoRA. See [current preparation evidence](../docs/results/dora-preflight.md).
+
+First dispatch with paid confirmation **false**. The dry-run creates no compute.
+Proposed diagnostic limits: 45 GPU minutes, 15 CPU minutes, $0.65 compute cap
+including five-minute cleanup reserves per phase. Existing controller ceilings
+are MIG $0.69/hour and CPU $0.20/hour; actual cpu3c was previously $0.06/hour
+and must be rechecked. No more expensive GPU fallback is permitted. This plan
+is not budget authorization; request any new session allocation before creation.
+Use diagnosis timings to select the formal deadline/cap, rather than assuming
+DoRA costs the same as LoRA. No current CUDA performance estimate is measured.
+
+For formal DoRA dispatch, the reviewed diagnosis artifact must bind the image,
+source hash, diagnostic Actions run, `methods: ["lora", "simplex", "dora"]`,
+`completed_runs: 9` and `diagnostic_steps: 50`. A two-method diagnosis cannot
+unlock a three-method formal run. Keep the old review record; publish the new
+review in `docs/results/dora-diagnosis-review.json`, then dispatch
+`Publish reviewed gradient decision` with `experiment=dora` once the evidence exists.
+
+The result archive remains bounded to 1 GiB (512 MiB file payload), 1000 members,
+90-day Actions retention, and a 10 GB CPU writable disk. Nine runs plus added
+telemetry are expected to fit well within this bound; actual sizes/file counts
+must be measured, never assumed to be the historical 110. Training/cache stay
+local; per-file SHA-256 is sealed before the completion marker is written last.
+A new run ID preserves every historical Global Volume directory.
+
+GPU removal precedes CPU-only cross-region recovery; recovery needs the original
+profile/image/source and confirmed prior GPU cleanup. It does not rent a GPU or
+require another diagnosis review for an already-completed formal archive.
+The normal `finally` plus Actions `always()` ownership checks remain in force.

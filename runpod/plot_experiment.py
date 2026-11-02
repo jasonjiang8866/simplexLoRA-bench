@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 
 def plot(analysis, output):
-    colors = {'lora': '#2367a6', 'simplex': '#cc6519'}
+    colors = {'lora': '#2367a6', 'simplex': '#cc6519', 'dora': '#16836b'}
     styles = {17: '-', 42: '--', 123: ':'}
     plt.rcParams.update({'font.size': 10, 'svg.hashsalt': 'simplexbench'})
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True)
