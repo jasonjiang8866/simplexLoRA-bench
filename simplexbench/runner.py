@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
+from peft import PeftModel, LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 from sklearn.metrics import f1_score
 from torch.utils.data import DataLoader
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, BitsAndBytesConfig
@@ -34,6 +34,8 @@ def parameter_group(name):
         return "importance"
     if "modules_to_save.default" in name:
         return "head"
+    if "lora_magnitude_vector" in name:
+        return "magnitude"
     if "lora_A" in name:
         return "adapter_A"
     if "lora_B" in name:
@@ -89,18 +91,28 @@ class ClassificationProbe:
                 "batch_sha256": digest({k: v.detach().cpu().tolist() for k, v in batch.items()})}
 
 
-def optimizer_inventory(model, optimizer):
+def optimizer_inventory(model, optimizer, require_state=False):
     live = {id(p) for p in model.parameters() if p.requires_grad}
     entries = [id(p) for g in optimizer.param_groups for p in g["params"]]
     if len(entries) != len(set(entries)) or set(entries) != live:
         raise RuntimeError("Missing, duplicate or stale optimizer parameters")
-    return {"parameter_tensors": len(entries), "state_tensors": len(optimizer.state)}
+    states = {}
+    for name, p in model.named_parameters():
+        if p.requires_grad:
+            state = optimizer.state.get(p, {})
+            if require_state and not {"step", "exp_avg", "exp_avg_sq"} <= state.keys():
+                raise RuntimeError("Missing AdamW state for trained parameter")
+            g = states.setdefault(parameter_group(name), {"parameters_with_state": 0, "bytes": 0})
+            g["parameters_with_state"] += bool(state)
+            g["bytes"] += sum(v.numel() * v.element_size() for v in state.values() if torch.is_tensor(v))
+    return {"parameter_tensors": len(entries), "state_tensors": len(optimizer.state),
+            "state_by_group": states, "state_bytes": sum(g["bytes"] for g in states.values())}
 
 
 def gradient_stats(named_parameters, spike_norm):
     missing, nonfinite, zero = [], [], []
     squared = 0.0
-    groups = {k: 0.0 for k in ("head", "adapter_A", "adapter_B", "importance", "other")}
+    groups = {k: 0.0 for k in ("head", "adapter_A", "adapter_B", "magnitude", "importance", "other")}
     for name, parameter in named_parameters:
         if not parameter.requires_grad:
             continue
@@ -167,7 +179,7 @@ def load_data(c, tokenizer):
     return splits, identity
 
 
-def load_model(c):
+def load_base(c):
     if not torch.cuda.is_available():
         raise RuntimeError("Production benchmarks require CUDA; CPU fallback is forbidden")
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -181,14 +193,92 @@ def load_model(c):
         raise RuntimeError("Model is not actually an 8-bit bitsandbytes base")
     model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=False)
     model.config.use_cache = False
+    return model, quantized
+
+
+def load_model(c, method="lora"):
+    model, quantized = load_base(c)
     model = get_peft_model(model, LoraConfig(
         task_type=TaskType.SEQ_CLS, r=c["rank"], lora_alpha=c["alpha"],
         lora_dropout=0.0, target_modules=c["target_modules"], bias="none",
-        modules_to_save=["score"]))
+        modules_to_save=["score"], use_dora=method == "dora"))
     if any(p.requires_grad for n, p in model.named_parameters()
            if "lora_" not in n and "modules_to_save.default" not in n):
         raise RuntimeError("Unexpected trainable base parameters")
+    assert_trainable(model, method)
     return model, quantized
+
+
+def assert_trainable(model, method):
+    groups = parameter_inventory(model)
+    expected = {"head", "adapter_A", "adapter_B"} | ({"magnitude"} if method == "dora" else set())
+    if set(groups) != expected:
+        raise RuntimeError("Unexpected trainable groups or accidentally frozen parameter group")
+    for _, layer in model.named_modules():
+        if hasattr(layer, "lora_A") and "default" in layer.lora_A:
+            params = [layer.lora_A["default"].weight, layer.lora_B["default"].weight]
+            if method == "dora":
+                params.append(layer.lora_magnitude_vector["default"].weight)
+            if not all(p.requires_grad for p in params):
+                raise RuntimeError("Accidentally frozen adapter parameter")
+
+
+def parameter_inventory(model):
+    groups = {}
+    for name, p in model.named_parameters():
+        if p.requires_grad:
+            g = groups.setdefault(parameter_group(name), {"numel": 0, "bytes": 0, "tensors": 0})
+            g["numel"] += p.numel(); g["bytes"] += p.numel() * p.element_size(); g["tensors"] += 1
+    return groups
+
+
+def frozen_signature(model):
+    import hashlib
+    h = hashlib.sha256()
+    for n, p in model.named_parameters():
+        if p.requires_grad or "lora_" in n or "modules_to_save" in n:
+            continue
+        h.update(n.replace(".base_layer.", ".").encode())
+        h.update(p.detach().contiguous().cpu().view(torch.uint8).numpy().tobytes())
+    return h.hexdigest()
+
+
+def magnitude_snapshot(model):
+    return {n: p.detach().clone() for n, p in model.named_parameters() if "lora_magnitude_vector" in n}
+
+
+@torch.no_grad()
+def magnitude_stats(model, initial):
+    if not initial:
+        return None
+    current = dict(model.named_parameters())
+    values = torch.cat([current[n].detach().flatten() for n in initial])
+    delta = torch.cat([(current[n].detach() - v).flatten() for n, v in initial.items()])
+    if not torch.isfinite(values).all():
+        raise RuntimeError("Nonfinite DoRA magnitude")
+    return {"numel": values.numel(), "min": float(values.min()), "max": float(values.max()),
+            "mean": float(values.mean()), "norm": float(values.norm()),
+            "delta_l2": float(delta.norm()), "delta_abs_max": float(delta.abs().max())}
+
+
+@torch.no_grad()
+def verify_reload(model, base, destination, batch):
+    model.eval()
+    expected = model(**batch).logits.detach()
+    loaded = PeftModel.from_pretrained(base(), destination).eval()
+    actual = loaded(**batch).logits.detach()
+    torch.testing.assert_close(actual, expected, atol=2e-3, rtol=2e-3)
+    restored = dict(loaded.named_parameters())
+    checked = []
+    for n, p in model.named_parameters():
+        if p.requires_grad:
+            if n not in restored or not torch.equal(p, restored[n]):
+                raise RuntimeError("Checkpoint parameter missing or changed: " + n)
+            checked.append(n)
+    return {"passed": True, "max_logit_difference": float((expected-actual).abs().max()),
+            "atol": 2e-3, "rtol": 2e-3, "exact_parameter_names": checked,
+            "head_verified": any("modules_to_save.default" in n for n in checked),
+            "magnitude_verified": any("lora_magnitude_vector" in n for n in checked)}
 
 
 @torch.no_grad()
@@ -230,7 +320,7 @@ def _train(c, method, seed, output, manifest_id):
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
     splits, identity = load_data(c, tokenizer)
-    model, quantized = load_model(c)
+    model, quantized = load_model(c, method)
     model.config.pad_token_id = tokenizer.pad_token_id
     model.train()
     controller = SimplexController(model, c["rank"], c["rank_interval"], c["rank_updates"],
@@ -242,6 +332,9 @@ def _train(c, method, seed, output, manifest_id):
                     "sha256": __import__("hashlib").sha256(
                         probe.head.weight.detach().cpu().numpy().tobytes()).hexdigest()}
     optimizer_inventory(model, optimizer)
+    frozen_initial = frozen_signature(model)
+    magnitude_initial = magnitude_snapshot(model)
+    initial_inventory = parameter_inventory(model)
     initial_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     loader = DataLoader(splits["train"], batch_size=c["batch_size"], shuffle=True,
                         generator=torch.Generator().manual_seed(seed), num_workers=0)
@@ -256,7 +349,8 @@ def _train(c, method, seed, output, manifest_id):
         "gpu": torch.cuda.get_device_name(), "cuda": torch.version.cuda,
         "quantized_linear_count": quantized, "setup_seconds": setup_seconds,
         "head_initial": head_initial, "loss_reduction": "mean", "clip_max_norm": 1.0,
-        "pad_token_id": tokenizer.pad_token_id})
+        "pad_token_id": tokenizer.pad_token_id, "initial_parameter_inventory": initial_inventory,
+        "magnitude_initial": magnitude_stats(model, magnitude_initial)})
     synchronize()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
@@ -301,6 +395,7 @@ def _train(c, method, seed, output, manifest_id):
             if stats["post_clip"]["norm"] > 1.00001:
                 raise RuntimeError("Gradient clipping failed")
             optimizer.step()
+            optimizer_inventory(model, optimizer, require_state=True)
             head_state = optimizer.state.get(probe.head.weight)
             ranks_before = {n: m.r["default"] for n, m in controller.layers.items()} if controller else None
             changed = controller.step(step) if controller else False
@@ -309,6 +404,7 @@ def _train(c, method, seed, output, manifest_id):
                 if optimizer.state.get(probe.head.weight) is not head_state:
                     raise RuntimeError("Classifier optimizer moments lost on rank update")
             inventory = optimizer_inventory(model, optimizer)
+            magnitude = magnitude_stats(model, magnitude_initial)
             synchronize()
             seconds = time.perf_counter() - before
             step_times.append(seconds)
@@ -317,7 +413,7 @@ def _train(c, method, seed, output, manifest_id):
                 stable_times.append(seconds)
             log.write(json.dumps({"step": step, "loss": float(loss.detach()), "lr": lr,
                                   "seconds": seconds, "rank_update": changed, "gradients": stats,
-                                  "observations": observation, "optimizer": inventory,
+                                  "observations": observation, "optimizer": inventory, "magnitude": magnitude,
                                   "ranks_before": ranks_before if changed else None,
                                   "ranks_after": controller.history[-1] if changed else None},
                                  allow_nan=False) + "\n")
@@ -338,8 +434,24 @@ def _train(c, method, seed, output, manifest_id):
     test_f1 = evaluate(model, evaluations["test"], c["num_labels"])
     if controller and not controller.frozen:
         raise RuntimeError("Incomplete rank search")
+    peak_allocated = torch.cuda.max_memory_allocated()
+    peak_reserved = torch.cuda.max_memory_reserved()
+    final_optimizer = optimizer_inventory(model, optimizer, require_state=True)
+    frozen_final = frozen_signature(model)
+    if frozen_final != frozen_initial:
+        raise RuntimeError("Frozen base changed during training")
     model.save_pretrained(output / "adapter", safe_serialization=True)
     tokenizer.save_pretrained(output / "adapter")
+    def reload_base():
+        base, _ = load_base(c)
+        base.config.pad_token_id = tokenizer.pad_token_id
+        return base
+    reload_start = time.perf_counter()
+    reload_evidence = verify_reload(model, reload_base, output / "adapter", device_batch)
+    reload_evidence["frozen_base_sha256"] = frozen_final
+    reload_evidence["frozen_base_unchanged"] = True
+    reload_evidence["seconds"] = time.perf_counter() - reload_start
+    atomic_json(output / "reload.json", reload_evidence)
     atomic_json(output / "ranks.json", controller.history if controller else [])
     atomic_json(output / "anomalies.json", anomalies)
     result = {
@@ -352,8 +464,11 @@ def _train(c, method, seed, output, manifest_id):
         "step_seconds_mean": float(np.mean(step_times)),
         "steady_step_seconds_median": float(np.median(stable_times)) if stable_times else None,
         "step_seconds_p95": float(np.percentile(step_times, 95)),
-        "peak_allocated_bytes": torch.cuda.max_memory_allocated(),
-        "peak_reserved_bytes": torch.cuda.max_memory_reserved(),
+        "peak_allocated_bytes": peak_allocated,
+        "peak_reserved_bytes": peak_reserved,
+        "initial_parameter_inventory": initial_inventory, "final_parameter_inventory": parameter_inventory(model),
+        "optimizer_final": final_optimizer, "magnitude_final": magnitude_stats(model, magnitude_initial),
+        "checkpoint_reload": reload_evidence,
         "initial_trainable_parameters": initial_parameters,
         "final_trainable_parameters": sum(p.numel() for p in model.parameters() if p.requires_grad),
         "gradient_anomaly_steps": len(anomalies), "quantized_linear_count": quantized}

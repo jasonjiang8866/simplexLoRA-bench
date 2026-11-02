@@ -1,8 +1,43 @@
 # simplexLoRA-bench
 
 An isolated **8-bit frozen base + sequence-classification head** benchmark:
-standard LoRA **r=8** versus a paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206) implementation, with
-three paired seeds and a RunPod launch path.
+standard LoRA **r=8**, paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206),
+and PEFT [DoRA](https://arxiv.org/abs/2402.09353), with three paired seeds.
+
+**DoRA benchmark complete:** [nine independent 500-step runs](docs/results/dora-benchmark-41399541318.md)
+on one GPU and one immutable image, following the [nine-run 50-step diagnosis](docs/results/dora-diagnosis-41396288500.md).
+Real CUDA/int8 forward/backward, frozen-base/optimizer checks, magnitude/head
+checkpoint reload and cross-region CPU recovery all passed. All 170 archived
+files were verified; [final inspection](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41406335557)
+found zero managed Pods. Diagnosis plus formal compute estimate: **$0.828779**
+of the approved $4.50, excluding storage/request fees.
+
+| Method | Test macro-F1 (mean ± sample SD, n=3) | Validation target reached |
+|---|---:|---:|
+| LoRA | 0.8848449786 ± 0.0058031888 | 3/3 |
+| Simplex | 0.8838181974 ± 0.0053869999 | 3/3 |
+| DoRA | 0.8874348790 ± 0.0064631697 | 3/3 |
+
+DoRA−LoRA is **+0.0025899004 ± 0.0028636541**; DoRA−Simplex is
+**+0.0036166816 ± 0.0019595379** (paired differences). Three seeds support a
+descriptive comparison, not a general superiority claim. DoRA adds **21,504**
+magnitude parameters at r=8 and has about **5.5%** higher mean instrumented step
+time than LoRA. Full timing, memory, parameter counts, gradients, paired values,
+hashes and lifecycle evidence are in the report.
+
+![Three-method validation curves](docs/results/dora-benchmark-41399541318.svg)
+
+```bash
+simplex-bench matrix --config configs/diagnostic-dora.json --output outputs/dora-diagnosis
+simplex-bench matrix --config configs/benchmark-dora.json --output outputs/dora-benchmark
+```
+
+These profiles require nine independent runs (50 and 500 steps respectively),
+including a real Qwen2 CUDA/int8 gate and checkpoint output/magnitude/head reload.
+They preserve the original hyperparameters and use a balanced cyclic method order.
+The following completed results are the **historical two-method experiment**.
+The new batch independently reproduced its six test scores; old results were
+not reused or pooled with the new nine-run experiment.
 
 The [full GPU benchmark](docs/results/benchmark-41333468131.md) is complete:
 six independent 500-step runs, real CUDA/int8 gate, verified cross-region
@@ -47,7 +82,7 @@ python -m simplexbench.compat --cuda --output compatibility-gpu.json
 ```
 
 CPU-only validation uses the PyTorch CPU index and `.[test]`; omit `--cuda`.
-It tests real PEFT, Transformers and randomly initialized local Llama weights,
+It tests real PEFT, Transformers and randomly initialized local Qwen2 weights,
 without downloading a model. It does **not** validate bitsandbytes GPU kernels.
 The CUDA gate constructs, saves and loads a tiny local model in actual int8,
 then checks backward, rank changes, frozen-base integrity and adapter reload.
@@ -79,7 +114,7 @@ modules must have equal per-rank costs. Private/gated repositories use a local
 Each run writes `steps.jsonl`, `evaluations.json`, `anomalies.json`,
 `ranks.json`, `provenance.json`, `result.json` and a reloadable PEFT
 adapter **including the classifier**. The status file seals artifact hashes.
-The summary requires all six runs, contiguous steps, final evaluations, valid
+The summary requires every method/seed declared in the manifest, contiguous steps, final evaluations, valid
 adapter tensors, matching data/hardware/software, and completed rank search.
 
 - Report mean ± sample standard deviation and paired F1 deltas. Three seeds

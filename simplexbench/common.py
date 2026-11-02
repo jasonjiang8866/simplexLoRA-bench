@@ -24,7 +24,25 @@ def file_hash(path):
     return h.hexdigest()
 
 
+def methods_for(c):
+    methods = tuple(c.get("methods", ("lora", "simplex")))
+    if methods not in (("lora", "simplex"), ("lora", "simplex", "dora")):
+        raise ValueError("Unsupported method matrix")
+    return methods
+
+
+def execution_order(c):
+    methods = methods_for(c)
+    return [{"method": m, "seed": seed}
+            for i, seed in enumerate(c["seeds"])
+            for m in (methods[i % 3:] + methods[:i % 3] if len(methods) == 3
+                      else methods if i % 2 == 0 else methods[::-1])]
+
+
 def validate_config(c):
+    methods = methods_for(c)
+    if "dora" in methods and c.get("evidence_version") != 2:
+        raise ValueError("DoRA requires complete v2 evidence")
     for key, value in c.items():
         if isinstance(value, float) and not math.isfinite(value):
             raise ValueError(f"Nonfinite configuration: {key}")

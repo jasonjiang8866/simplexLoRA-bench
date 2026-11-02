@@ -37,3 +37,31 @@ class ProfileTests(unittest.TestCase):
                 'clientBalance': 1.5, 'currentSpendPerHr': 0, 'dailyCharges': []}}}):
             with self.assertRaises(RuntimeError):
                 provider.budget(api, reserve=2)
+
+    def test_dora_profile_requires_nine_500_step_runs_and_magnitude(self):
+        p = experiment.plan('benchmark-dora', provider.IMAGE, 'b'*40, 120, 2)
+        self.assertEqual(p['expected_runs'], 9)
+        self.assertEqual(p['steps'], 500)
+        p['source'] = provider.SOURCE
+        r = result(); report = r['report']
+        report['image_source_sha'] = 'b'*40
+        gate = report['compatibility']; gate['model_type'] = 'qwen2'
+        gate['methods']['dora'] = {**gate['methods']['lora'], 'optimizer_coverage': True,
+                                   'reload': {'magnitude_verified': True}}
+        rows = report['summary']['runs']
+        for row in rows:
+            row.update(steps=500, checkpoint_reload={'passed': True})
+        # A completed historical six-run matrix cannot satisfy this profile.
+        with self.assertRaisesRegex(ValueError, 'Incomplete matrix'):
+            global_smoke.validate_result(r, 'restore', metadata(), p)
+        for seed in (17, 42, 123):
+            rows.append({**rows[0], 'method': 'dora', 'seed': seed,
+                         'checkpoint_reload': {'passed': True, 'magnitude_verified': True},
+                         'magnitude_final': {'delta_l2': .001}})
+        global_smoke.validate_result(r, 'restore', metadata(), p)
+        for mutate in (lambda r: r['report']['summary']['runs'][-1].update(steps=50),
+                       lambda r: r['report']['summary']['runs'][-1]['checkpoint_reload'].update(magnitude_verified=False),
+                       lambda r: r['report']['compatibility'].update(model_type='llama')):
+            broken = copy.deepcopy(r); mutate(broken)
+            with self.assertRaises(ValueError):
+                global_smoke.validate_result(broken, 'restore', metadata(), p)

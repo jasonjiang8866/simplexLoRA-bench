@@ -1,0 +1,52 @@
+{
+  "decision": "proceed",
+  "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:3af1106bf5798af9643cce4792f50cea4af832c68a9e803b87dedec9e8a77b71",
+  "image_source_sha": "fba99733fd746af43fe7574e9cbcddb775737162",
+  "source_hash": "c9a8254ea13319910afb90a8d7b2a8f85739680936cb3c59150e6547371862a1",
+  "diagnostic_run": 41396288500,
+  "diagnostic_artifact_sha256": "d709cdaa46985ad92c07a401c0b653e58a2063d34a230cb344447a02dbecb355",
+  "diagnostic_archive_sha256": "ca65392b9f144a85ea8d0a1d4ee225b8575a7eeabccf03cfbc63dd4fdfac5c8e",
+  "methods": [
+    "lora",
+    "simplex",
+    "dora"
+  ],
+  "completed_runs": 9,
+  "diagnostic_steps": 50,
+  "checks": {
+    "sealed_run_artifacts_verified": true,
+    "cuda_int8_gate_passed": true,
+    "complete_matrix": true,
+    "paired_batches_and_initial_heads": true,
+    "finite_present_gradients": true,
+    "clipping_verified": true,
+    "analytic_head_gradient_verified": true,
+    "frozen_base_unchanged": true,
+    "exact_trainable_reload_and_zero_logit_error": true,
+    "magnitude_updated": true,
+    "cross_region_cpu_recovery": true,
+    "gpu_cpu_cleanup_confirmed": true
+  },
+  "rationale": "Real Qwen2 CUDA/int8 gate and nine complete Qwen2.5 diagnostic runs passed. Head dominates gradient norm; analytic mean-CE head gradient, paired batches/initial heads, optimizer coverage/state, frozen base and exact adapter/magnitude/head reload verified. Preserve all training hyperparameters, spike threshold and clipping. No accuracy superiority inference from the diagnostic.",
+  "authorized_session_budget_usd": 4.5,
+  "diagnostic_compute_estimate_usd": 0.20225999467571576,
+  "formal_plan": {
+    "basis": "Observed GPU lifetime + 9 * sum(50-step train_wall_seconds), retaining observed setup/final-test/export/startup overhead; includes repeated validation. Estimate, not guarantee.",
+    "gpu_seconds_estimate": 3381.2627700065495,
+    "cpu_seconds_estimate": 451.84057354927063,
+    "compute_estimate_usd": 0.6556060404770764,
+    "gpu_deadline_minutes": 90,
+    "cpu_deadline_minutes": 15,
+    "max_compute_usd": 1.2,
+    "worst_case_compute_usd": 1.1591666666666667,
+    "diagnostic_payload_bytes": 156764909,
+    "diagnostic_step_jsonl_bytes": 791308,
+    "formal_payload_estimate_bytes": 163886681,
+    "payload_limit_bytes": 536870912
+  },
+  "limitations": [
+    "Simplex importance max deviation from one remains about 1.1e-5 and floor rounding yields ranks 7\u20138 under joint clipping.",
+    "DoRA adds 21504 magnitude parameters; equal initial rank is not equal parameter count.",
+    "Nine formal runs must execute independently on one new GPU with this exact image/source; old six-run results are historical only."
+  ]
+}

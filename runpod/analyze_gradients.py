@@ -29,12 +29,15 @@ def analyze(path):
                 'first': rows[0], 'last': rows[-1],
                 'rank_boundaries': [x for x in rows if x['rank_update'] or x['step'] in (11, 21, 31)],
                 'analytic_head_relative_error_max': max(x.get('observations', {}).get('analytic_head_grad_relative_error', 0) for x in rows)}
+    methods = sorted({key.rsplit('-',1)[0] for key in runs})
     paired = []
     for seed in (17, 42, 123):
-        a, b = [runs[f'{m}-{seed}']['first'] for m in ('lora', 'simplex')]
-        paired.append({'seed': seed, 'first_loss_delta': b['loss'] - a['loss'],
-                       'first_norm_delta': b['gradients']['norm'] - a['gradients']['norm'],
-                       'first_batch_matches': a.get('observations', {}).get('batch_sha256') == b.get('observations', {}).get('batch_sha256')})
+        for method in methods:
+            if method == 'lora': continue
+            a, b = [runs[f'{m}-{seed}']['first'] for m in ('lora', method)]
+            paired.append({'seed': seed, 'comparison': method + '-lora', 'first_loss_delta': b['loss'] - a['loss'],
+                           'first_norm_delta': b['gradients']['norm'] - a['gradients']['norm'],
+                           'first_batch_matches': a.get('observations', {}).get('batch_sha256') == b.get('observations', {}).get('batch_sha256')})
     return {'runs': runs, 'paired': paired,
             'interpretation': 'Observations only. Human review required before full benchmark; norm >100 is not an automatic failure.'}
 

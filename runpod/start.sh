@@ -3,7 +3,7 @@ set -Eeuo pipefail
 cd /opt/bench
 MODE="${BENCH_MODE:-smoke}"
 RUN_ID="${BENCH_RUN_ID:-simplexlora-${MODE}}"
-[[ "$MODE" == smoke || "$MODE" == benchmark || "$MODE" == diagnostic ]] || { echo "Invalid BENCH_MODE"; exit 2; }
+[[ "$MODE" == smoke || "$MODE" == benchmark || "$MODE" == diagnostic || "$MODE" == diagnostic-dora || "$MODE" == benchmark-dora ]] || { echo "Invalid BENCH_MODE"; exit 2; }
 [[ "$RUN_ID" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Invalid BENCH_RUN_ID"; exit 2; }
 SECONDS_LIMIT="${BENCH_TIMEOUT_SECONDS:-14400}"
 [[ "$SECONDS_LIMIT" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid timeout"; exit 2; }

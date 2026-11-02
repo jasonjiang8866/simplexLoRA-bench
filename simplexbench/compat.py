@@ -6,9 +6,11 @@ from pathlib import Path
 
 import torch
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model, prepare_model_for_kbit_training
-from transformers import BitsAndBytesConfig, LlamaConfig, LlamaForSequenceClassification
+from transformers import BitsAndBytesConfig, Qwen2Config, Qwen2ForSequenceClassification
 
 from .common import atomic_json
+from .runner import (assert_trainable, optimizer_inventory, magnitude_snapshot,
+                     magnitude_stats, parameter_inventory, verify_reload, gradient_stats)
 from .simplex import SimplexController, rebuild_optimizer
 
 
@@ -18,20 +20,20 @@ def check(cuda=False):
     torch.set_num_threads(1)
     torch.manual_seed(91)
     device = "cuda" if cuda else "cpu"
-    report = {"status": "running", "device": device, "bits": 8 if cuda else 32, "methods": {}}
+    report = {"status": "running", "device": device, "bits": 8 if cuda else 32, "methods": {}, "model_type": "qwen2"}
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        config = LlamaConfig(vocab_size=64, hidden_size=32, intermediate_size=64,
+        config = Qwen2Config(vocab_size=64, hidden_size=32, intermediate_size=64,
                              num_hidden_layers=2, num_attention_heads=4, num_key_value_heads=2,
                              max_position_embeddings=64, num_labels=3, pad_token_id=0)
-        LlamaForSequenceClassification(config).save_pretrained(root / "base")
+        Qwen2ForSequenceClassification(config).save_pretrained(root / "base")
 
         def base():
             kwargs = {"attn_implementation": "eager"}
             if cuda:
                 kwargs.update(quantization_config=BitsAndBytesConfig(load_in_8bit=True),
                               device_map={"": 0}, torch_dtype=torch.float32)
-            result = LlamaForSequenceClassification.from_pretrained(root / "base", **kwargs)
+            result = Qwen2ForSequenceClassification.from_pretrained(root / "base", **kwargs)
             if cuda:
                 import bitsandbytes as bnb
                 if not any(isinstance(m, bnb.nn.Linear8bitLt) for m in result.modules()):
@@ -41,10 +43,13 @@ def check(cuda=False):
         batch = {"input_ids": torch.tensor([[1, 3, 5, 7], [1, 8, 9, 2]], device=device),
                  "attention_mask": torch.ones(2, 4, dtype=torch.long, device=device),
                  "labels": torch.tensor([0, 2], device=device)}
-        for method in ("lora", "simplex"):
+        for method in ("lora", "simplex", "dora"):
             model = get_peft_model(base(), LoraConfig(
                 task_type=TaskType.SEQ_CLS, r=8, lora_alpha=16,
-                target_modules=["q_proj"], modules_to_save=["score"], lora_dropout=0.0))
+                target_modules=["q_proj"], modules_to_save=["score"], lora_dropout=0.0, use_dora=method == "dora"))
+            assert_trainable(model, method)
+            initial = magnitude_snapshot(model)
+            gradient_evidence = []
             frozen = {n: p.detach().clone() for n, p in model.named_parameters() if not p.requires_grad}
             controller = SimplexController(model, interval=2, updates=2) if method == "simplex" else None
             optimizer = rebuild_optimizer(model, None, 0.005, 0)
@@ -57,7 +62,10 @@ def check(cuda=False):
                 if any(p.grad is None or not torch.isfinite(p.grad).all()
                        for p in model.parameters() if p.requires_grad):
                     raise RuntimeError("Invalid compatibility gradients")
+                optimizer_inventory(model, optimizer)
+                gradient_evidence.append(gradient_stats(model.named_parameters(), 100))
                 optimizer.step()
+                optimizer_inventory(model, optimizer)
                 if controller and controller.step(step):
                     optimizer = rebuild_optimizer(model, optimizer, 0.005, 0)
             if controller and not controller.frozen:
@@ -69,15 +77,18 @@ def check(cuda=False):
             expected = model(**batch).logits.detach()
             destination = root / method
             model.save_pretrained(destination)
-            loaded = PeftModel.from_pretrained(base(), destination).eval()
-            actual = loaded(**batch).logits.detach()
-            torch.testing.assert_close(actual, expected, atol=1e-5 if not cuda else 2e-3,
-                                       rtol=1e-4 if not cuda else 2e-3)
+            reload = verify_reload(model, base, destination, batch)
+            magnitude = magnitude_stats(model, initial)
+            if method == "dora" and (magnitude["delta_l2"] <= 0 or not reload["magnitude_verified"]):
+                raise RuntimeError("DoRA magnitude did not update/reload")
             report["methods"][method] = {
                 "forward_backward": True, "frozen_base": True, "save_reload": True,
-                "max_logit_difference": float((expected - actual).abs().max()),
+                "max_logit_difference": reload["max_logit_difference"],
+                "optimizer_coverage": True, "parameter_inventory": parameter_inventory(model),
+                "optimizer": optimizer_inventory(model, optimizer), "reload": reload,
+                "magnitude": magnitude, "gradients": gradient_evidence,
                 "rank_events": len(controller.history) if controller else 0}
-            del model, loaded, optimizer, frozen, controller
+            del model, optimizer, frozen, controller, initial
             if cuda:
                 torch.cuda.empty_cache()
     report["status"] = "passed"

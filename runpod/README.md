@@ -315,3 +315,60 @@ Do not rerun the whole paid job merely to retry a failed CPU restoration.
 Both `provision-*.json` files must show `cleanup_confirmed: true`. After the job,
 run **Inspect managed RunPod compute** to independently verify that managed Pod
 count is zero. Preserve the Global Volume and unrelated resources.
+
+
+## Three-method DoRA profiles
+
+Select `diagnostic-dora` (nine × 50 prefix steps) or `benchmark-dora`
+(nine × 500 steps) in `RunPod gradient diagnosis and full benchmark`.
+The historical `diagnostic` / `benchmark` choices remain two-method profiles.
+Use the new image digest and exact source SHA from publication; the historical
+image cannot execute DoRA. See [current preparation evidence](../docs/results/dora-preflight.md).
+
+First dispatch with paid confirmation **false**. The dry-run creates no compute.
+Proposed diagnostic limits: 45 GPU minutes, 15 CPU minutes, $0.65 compute cap
+including five-minute cleanup reserves per phase. Existing controller ceilings
+are MIG $0.69/hour and CPU $0.20/hour; actual cpu3c was previously $0.06/hour
+and must be rechecked. No more expensive GPU fallback is permitted. This plan
+is not budget authorization; request any new session allocation before creation.
+Use diagnosis timings to select the formal deadline/cap, rather than assuming
+DoRA costs the same as LoRA. The completed run below now supplies measured costs.
+
+For formal DoRA dispatch, the reviewed diagnosis artifact must bind the image,
+source hash, diagnostic Actions run, `methods: ["lora", "simplex", "dora"]`,
+`completed_runs: 9` and `diagnostic_steps: 50`. A two-method diagnosis cannot
+unlock a three-method formal run. Keep the old review record; publish the new
+review in `docs/results/dora-diagnosis-review.json`, then dispatch
+`Publish reviewed gradient decision` with `experiment=dora` once the evidence exists.
+
+The result archive remains bounded to 1 GiB (512 MiB file payload), 1000 members,
+90-day Actions retention, and a 10 GB CPU writable disk. Nine runs plus added
+telemetry are expected to fit well within this bound; actual sizes/file counts
+must be measured, never assumed to be the historical 110. Training/cache stay
+local; per-file SHA-256 is sealed before the completion marker is written last.
+A new run ID preserves every historical Global Volume directory.
+
+GPU removal precedes CPU-only cross-region recovery; recovery needs the original
+profile/image/source and confirmed prior GPU cleanup. It does not rent a GPU or
+require another diagnosis review for an already-completed formal archive.
+The normal `finally` plus Actions `always()` ownership checks remain in force.
+
+### Completed three-method run — 2026-11-02 SGT
+
+[Diagnosis 41396288500](../docs/results/dora-diagnosis-41396288500.md) passed
+nine × 50 steps, then [formal 41399541318](../docs/results/dora-benchmark-41399541318.md)
+passed nine × 500 steps. Both used source
+`fba99733fd746af43fe7574e9cbcddb775737162` and immutable image
+`ghcr.io/jasonjiang8866/simplexlora-bench@sha256:3af1106bf5798af9643cce4792f50cea4af832c68a9e803b87dedec9e8a77b71`.
+The review publication run was `41399432092`. The measured diagnosis forecast
+selected formal limits of 90 GPU minutes / 15 CPU minutes / $1.20 phase cap.
+Live rates stayed at MIG $0.69/hour and cpu3c $0.06/hour.
+
+The formal export is `/global/simplexlora-bench/simplex-41399541318-1` on the
+existing volume `cmvwmviz9000007jteci4ajn8`. After GPU deletion in US-PA-1, a new
+CPU in EU-CZ-1 verified all 170 files, 163,209,130 payload bytes and the same
+summary, then was deleted. [Final inspection 41406335557](https://github.com/jasonjiang8866/simplexLoRA-bench/actions/runs/41406335557)
+confirmed zero managed Pods. Diagnosis plus formal compute estimate was
+$0.828779 within the user's $4.50 authorization; storage/request fees are extra.
+The report links the 90-day Actions artifact and records every archive/image/hash
+and lifecycle identity. Historical result directories and archives remain intact.

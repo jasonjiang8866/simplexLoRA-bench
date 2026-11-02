@@ -6,7 +6,7 @@ import urllib.request
 
 from provider import API, REPOSITORY, NoRedirect, Runpod
 
-PHASES = {'starting', 'global-volume-write-read', 'cuda-gate-and-six-smoke-workers',
+PHASES = {'starting', 'cuda-gate-and-configured-matrix', 'global-volume-write-read', 'cuda-gate-and-six-smoke-workers',
           'publish-completed-results', 'fresh-pod-global-restore', 'complete'}
 
 
