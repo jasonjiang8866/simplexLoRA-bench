@@ -1,6 +1,6 @@
 # Paired gradient-clipping ablation (pre-registered design)
 
-Status: **18-run GPU diagnosis accepted**; see [diagnosis report](results/clipping-diagnosis-41610971757.md). The formal 500-step comparison remains pending.
+Status: **diagnosis and all 18 formal 500-step runs accepted**; see [final report](results/clipping-benchmark-41622525767.md) and [diagnosis](results/clipping-diagnosis-41610971757.md). Independent CPU recovery and zero remaining temporary Pods verified.
 Base: `4faeaef4b64885a80be4c40ec8e0042792dac1c7` (merged PR #3).
 This is an optimization-policy ablation of this repository's implementation,
 **not a direct reproduction of the SimplexLoRA paper**. It cannot establish that

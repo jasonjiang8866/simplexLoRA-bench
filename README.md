@@ -4,10 +4,16 @@ An isolated **8-bit frozen base + sequence-classification head** benchmark:
 standard LoRA **r=8**, paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206),
 and PEFT [DoRA](https://arxiv.org/abs/2402.09353), with three paired seeds.
 
-**Gradient-clipping ablation prepared:** [paired experiment design](docs/CLIPPING_ABLATION.md)
-compares fresh global and head/adapter group clipping across all three methods
-and seeds (18 × 500 steps). CPU validation only; no GPU result is claimed.
-This is a separate optimization-policy ablation, not direct paper replication.
+**Gradient-clipping ablation complete:** [18 independent 500-step runs](docs/results/clipping-benchmark-41622525767.md)
+compare fresh global and head/adapter group clipping across all three methods
+and seeds. CUDA/int8, all nine pairs, independent cross-region CPU recovery and
+local artifact revalidation passed; final inventory confirmed zero managed Pods.
+Grouped-minus-global test macro-F1 changes were **+0.0027 pp (LoRA), −0.1868 pp
+(Simplex), and −0.1459 pp (DoRA)**. Grouping amplified importance changes but did
+not show a consistent accuracy benefit; global remains the existing default.
+Three seeds are descriptive. Grouped total norm can reach sqrt(2), versus 1 for
+global, so this is an optimization-policy ablation, not direct paper replication.
+Diagnosis plus formal compute estimate: **$1.705885**, excluding storage/request fees.
 
 **DoRA benchmark complete:** [nine independent 500-step runs](docs/results/dora-benchmark-41399541318.md)
 on one GPU and one immutable image, following the [nine-run 50-step diagnosis](docs/results/dora-diagnosis-41396288500.md).

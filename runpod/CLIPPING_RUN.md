@@ -1,7 +1,7 @@
 # Clipping GPU execution proposal — 2026-11-03 (SGT)
 
 Status: GPU integration and browser Actions dispatch authorized on 2026-11-03;
-Initial US$5 budget increased to US$10 total, including incurred costs. Image and 18-run GPU diagnosis passed; see `docs/results/clipping-diagnosis-41610971757.md`.
+Initial US$5 budget increased to US$10 total, including incurred costs. Diagnosis and all 18 formal runs accepted; see `docs/results/clipping-benchmark-41622525767.md`. Diagnosis plus formal compute estimate: $1.705885, excluding storage/request fees. Independent final inventory found zero managed Pods.
 Approved training code is PR #4 at `713e5ea034b678c929f49690ff96bf4fe86abac5`.
 This file records the reviewed integration and authorized execution scope.
 
