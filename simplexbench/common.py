@@ -40,6 +40,8 @@ def execution_order(c):
 
 
 def validate_config(c):
+    if c.get("clipping_strategy", "global") not in ("global", "grouped"):
+        raise ValueError("Unknown clipping strategy")
     methods = methods_for(c)
     if "dora" in methods and c.get("evidence_version") != 2:
         raise ValueError("DoRA requires complete v2 evidence")

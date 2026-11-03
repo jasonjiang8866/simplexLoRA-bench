@@ -3,16 +3,18 @@ set -Eeuo pipefail
 cd /opt/bench
 MODE="${BENCH_MODE:-smoke}"
 RUN_ID="${BENCH_RUN_ID:-simplexlora-${MODE}}"
-[[ "$MODE" == smoke || "$MODE" == benchmark || "$MODE" == diagnostic || "$MODE" == diagnostic-dora || "$MODE" == benchmark-dora ]] || { echo "Invalid BENCH_MODE"; exit 2; }
+[[ "$MODE" == smoke || "$MODE" == benchmark || "$MODE" == diagnostic || "$MODE" == diagnostic-dora || "$MODE" == benchmark-dora || "$MODE" == diagnostic-clipping || "$MODE" == benchmark-clipping ]] || { echo "Invalid BENCH_MODE"; exit 2; }
 [[ "$RUN_ID" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Invalid BENCH_RUN_ID"; exit 2; }
 SECONDS_LIMIT="${BENCH_TIMEOUT_SECONDS:-14400}"
 [[ "$SECONDS_LIMIT" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid timeout"; exit 2; }
 mkdir -p "/workspace/results/$RUN_ID"
-# --resume validates source/config/checksums and restarts incomplete runs from zero.
+MODULE=simplexbench.cli
+[[ "$MODE" == *-clipping ]] && MODULE=simplexbench.ablation
+# Clipping resume rejects incomplete/corrupt runs; it never replaces a paired arm.
 # The timeout stops training, not billing. Stop/terminate the Pod in RunPod afterwards.
 set +e
 timeout --signal=TERM --kill-after=30s "$SECONDS_LIMIT" \
-  python -m simplexbench.cli matrix --config "configs/$MODE.json" \
+  python -m "$MODULE" matrix --config "configs/$MODE.json" \
     --output "/workspace/results/$RUN_ID" --resume \
   2>&1 | tee -a "/workspace/results/$RUN_ID/console.log"
 RESULT=${PIPESTATUS[0]}

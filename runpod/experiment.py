@@ -16,7 +16,7 @@ from provider import Runpod, budget, finite, identity, preflight
 
 
 def plan(mode, image, source_sha, gpu_minutes, max_cost):
-    if mode not in {"diagnostic", "benchmark", "diagnostic-dora", "benchmark-dora"}:
+    if mode not in {"diagnostic", "benchmark", "diagnostic-dora", "benchmark-dora", "diagnostic-clipping", "benchmark-clipping"}:
         raise ValueError("Invalid experiment mode")
     if not re.fullmatch(r"ghcr.io/jasonjiang8866/simplexlora-bench@sha256:[a-f0-9]{64}", image):
         raise ValueError("An immutable repository image is required")
@@ -33,10 +33,10 @@ def plan(mode, image, source_sha, gpu_minutes, max_cost):
     from simplexbench.cli import source_identity
     config = json.loads((Path(__file__).resolve().parents[1] / 'configs' / f'{mode}.json').read_text())
     return {"mode": mode, "steps": config['steps'], "image": image,
-            "methods": config.get("methods", ["lora", "simplex"]), "expected_runs": 3 * len(config.get("methods", ["lora", "simplex"])),
+            "methods": config.get("methods", ["lora", "simplex"]), "expected_runs": 3 * len(config.get("methods", ["lora", "simplex"])) * len(config.get("clipping_strategies", ["global"])),
             "source": source_identity(), "image_source_sha": source_sha,
             "gpu_seconds": gpu_minutes * 60, "cpu_seconds": 900,
-            "max_bytes": 1024**3, "max_compute_usd": max_cost,
+            "max_bytes": (2 if mode.endswith("-clipping") else 1) * 1024**3, "max_compute_usd": max_cost,
             "worst_case_compute_usd": ceiling, "config": config,
             "storage_request_fees": "additional; existing volume retained"}
 
@@ -58,6 +58,26 @@ def verify_prior(directory, profile, config):
     if {'bytes': path.stat().st_size, 'sha256': h} != result['report']['bundle']:
         raise ValueError('Prior archive corrupted')
     return {**meta, 'report': result['report']}
+
+
+def validate_review(review, profile):
+    if (review.get('decision') != 'proceed' or review.get('image') != profile['image'] or
+            review.get('source_hash') != profile['source'] or not review.get('diagnostic_run')):
+        raise ValueError('Missing reviewed diagnosis for this image/source')
+    if profile['mode'] in {'benchmark-dora', 'benchmark-clipping'}:
+        if (review.get('methods') != profile['methods'] or
+                review.get('completed_runs') != profile['expected_runs'] or
+                review.get('diagnostic_steps') != 50):
+            raise ValueError('Complete method-matrix diagnosis review required')
+    if profile['mode'] == 'benchmark-clipping':
+        from simplexbench.common import digest
+        diagnostic = dict(profile['config'], steps=50, schedule_steps=500)
+        if (review.get('clipping_strategies') != ['global', 'grouped'] or
+                review.get('diagnostic_config_sha256') != digest(diagnostic) or
+                review.get('paired_validation_passed') is not True or
+                review.get('cross_pod_restore_verified') is not True or
+                review.get('cleanup_verified') is not True):
+            raise ValueError('Paired clipping diagnosis and recovery review required')
 
 
 def main():
@@ -86,15 +106,7 @@ def main():
     if os.environ.get('CONFIRM_PAID_EXPERIMENT') != 'true':
         raise ValueError('Explicit paid dispatch required')
     if profile['mode'].startswith('benchmark') and args.action != 'restore':
-        # Written only after reviewing diagnostic evidence; must match this image.
-        review = json.loads(Path('diagnosis-review.json').read_text())
-        if (review.get('decision') != 'proceed' or review.get('image') != profile['image'] or
-                review.get('source_hash') != profile['source'] or not review.get('diagnostic_run')):
-            raise ValueError('Missing reviewed diagnosis for this image/source')
-    if profile['mode'] == 'benchmark-dora' and args.action != 'restore':
-        if (review.get('methods') != profile['methods'] or review.get('completed_runs') != 9 or
-                review.get('diagnostic_steps') != 50):
-            raise ValueError('Nine-run DoRA diagnosis review required')
+        validate_review(json.loads(Path('diagnosis-review.json').read_text()), profile)
     if args.action == 'restore':
         first = verify_prior(Path('restore-input'), profile, config)
         lifecycle.save('result-smoke.json', {'status': 'passed', 'report': first['report']})

@@ -57,7 +57,10 @@ def validate_result(result, phase, meta, profile=None):
         if gate.get("model_type") != "qwen2" or dora.get("optimizer_coverage") is not True or not dora.get("reload", {}).get("magnitude_verified"):
             raise ValueError("Missing Qwen2 DoRA checks")
     runs = r.get("summary", {}).get("runs", [])
-    if len(runs) != 3 * len(methods) or {(x.get("method"), x.get("seed")) for x in runs} != {
+    if profile['mode'].endswith('-clipping'):
+        from clipping_profile import validate_summary
+        validate_summary(r.get('summary', {}), profile['config'])
+    elif len(runs) != 3 * len(methods) or {(x.get("method"), x.get("seed")) for x in runs} != {
             (m, s) for m in methods for s in (17, 42, 123)}:
         raise ValueError("Incomplete matrix")
     for run in runs:

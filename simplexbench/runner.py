@@ -14,6 +14,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer, Bits
 
 from .common import atomic_json, digest, file_hash
 from .simplex import SimplexController, rebuild_optimizer
+from .clipping import parameter_group, clip_gradients, validate_clip_evidence, trainable_signature
 
 
 def synchronize():
@@ -27,20 +28,6 @@ def seed_all(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.benchmark = False
-
-
-def parameter_group(name):
-    if name == "simplex_importance":
-        return "importance"
-    if "modules_to_save.default" in name:
-        return "head"
-    if "lora_magnitude_vector" in name:
-        return "magnitude"
-    if "lora_A" in name:
-        return "adapter_A"
-    if "lora_B" in name:
-        return "adapter_B"
-    return "other"
 
 
 class ClassificationProbe:
@@ -331,6 +318,8 @@ def _train(c, method, seed, output, manifest_id):
                     "norm": float(probe.head.weight.detach().norm()),
                     "sha256": __import__("hashlib").sha256(
                         probe.head.weight.detach().cpu().numpy().tobytes()).hexdigest()}
+    ablation = "clipping_strategy" in c
+    initial_signature = trainable_signature(model, controller) if ablation else None
     optimizer_inventory(model, optimizer)
     frozen_initial = frozen_signature(model)
     magnitude_initial = magnitude_snapshot(model)
@@ -350,7 +339,11 @@ def _train(c, method, seed, output, manifest_id):
         "quantized_linear_count": quantized, "setup_seconds": setup_seconds,
         "head_initial": head_initial, "loss_reduction": "mean", "clip_max_norm": 1.0,
         "pad_token_id": tokenizer.pad_token_id, "initial_parameter_inventory": initial_inventory,
-        "magnitude_initial": magnitude_stats(model, magnitude_initial)})
+        "magnitude_initial": magnitude_stats(model, magnitude_initial),
+        **({"clipping_strategy": c["clipping_strategy"],
+            "gpu_uuid": str(torch.cuda.get_device_properties(0).uuid),
+            "initial_trainable_sha256": initial_signature,
+            "initial_frozen_sha256": frozen_initial} if ablation else {})})
     synchronize()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
@@ -388,17 +381,30 @@ def _train(c, method, seed, output, manifest_id):
                 atomic_json(output / "anomalies.json", anomalies)
             if stats["nonfinite"] or stats["missing"]:
                 raise RuntimeError(f"Invalid gradients at step {step}: {stats}")
-            clip_norm = torch.nn.utils.clip_grad_norm_([p for _, p in params if p.requires_grad],
-                                          max_norm=1.0, error_if_nonfinite=True)
-            stats["clip_coefficient"] = min(1.0, 1.0 / (float(clip_norm) + 1e-6))
-            stats["post_clip"] = gradient_stats(params, c["gradient_spike_norm"])
-            if stats["post_clip"]["norm"] > 1.00001:
-                raise RuntimeError("Gradient clipping failed")
+            if ablation:
+                synchronize()
+                clip_start = time.perf_counter()
+                stats["clipping"] = clip_gradients(params, c["clipping_strategy"])
+                synchronize()
+                clip_seconds = time.perf_counter() - clip_start
+                if c["clipping_strategy"] == "global":
+                    stats["clip_coefficient"] = stats["clipping"]["groups"]["global"]["coefficient"]
+                stats["post_clip"] = gradient_stats(params, c["gradient_spike_norm"])
+                validate_clip_evidence(stats, c["clipping_strategy"])
+            else:
+                clip_norm = torch.nn.utils.clip_grad_norm_([p for _, p in params if p.requires_grad],
+                                              max_norm=1.0, error_if_nonfinite=True)
+                stats["clip_coefficient"] = min(1.0, 1.0 / (float(clip_norm) + 1e-6))
+                stats["post_clip"] = gradient_stats(params, c["gradient_spike_norm"])
+                if stats["post_clip"]["norm"] > 1.00001:
+                    raise RuntimeError("Gradient clipping failed")
+            importance_active = ablation and controller is not None and not controller.frozen
             optimizer.step()
             optimizer_inventory(model, optimizer, require_state=True)
             head_state = optimizer.state.get(probe.head.weight)
             ranks_before = {n: m.r["default"] for n, m in controller.layers.items()} if controller else None
-            changed = controller.step(step) if controller else False
+            changed = controller.step(step, telemetry=ablation) if controller else False
+            importance = controller.last_update if importance_active else None
             if changed:
                 optimizer = rebuild_optimizer(model, optimizer, lr, c["weight_decay"])
                 if optimizer.state.get(probe.head.weight) is not head_state:
@@ -415,7 +421,9 @@ def _train(c, method, seed, output, manifest_id):
                                   "seconds": seconds, "rank_update": changed, "gradients": stats,
                                   "observations": observation, "optimizer": inventory, "magnitude": magnitude,
                                   "ranks_before": ranks_before if changed else None,
-                                  "ranks_after": controller.history[-1] if changed else None},
+                                  "ranks_after": controller.history[-1] if changed else None,
+                                  **({"clip_seconds": clip_seconds, "importance": importance}
+                                     if ablation else {})},
                                  allow_nan=False) + "\n")
             if step % c["eval_every"] == 0 or step == c["steps"]:
                 f1 = evaluate(model, evaluations["validation"], c["num_labels"])
@@ -471,6 +479,7 @@ def _train(c, method, seed, output, manifest_id):
         "checkpoint_reload": reload_evidence,
         "initial_trainable_parameters": initial_parameters,
         "final_trainable_parameters": sum(p.numel() for p in model.parameters() if p.requires_grad),
-        "gradient_anomaly_steps": len(anomalies), "quantized_linear_count": quantized}
+        "gradient_anomaly_steps": len(anomalies), "quantized_linear_count": quantized,
+        **({"clipping_strategy": c["clipping_strategy"]} if ablation else {})}
     atomic_json(output / "result.json", result)
     return result
