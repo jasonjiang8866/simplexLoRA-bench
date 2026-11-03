@@ -4,7 +4,7 @@ on:
     inputs:
       mode:
         type: choice
-        options: [diagnostic-dora, benchmark-dora, diagnostic, benchmark]
+        options: [diagnostic-clipping, benchmark-clipping, diagnostic-dora, benchmark-dora, diagnostic, benchmark]
         default: diagnostic-dora
       image:
         description: 'Published immutable ghcr.io/...@sha256 digest'

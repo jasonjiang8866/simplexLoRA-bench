@@ -165,11 +165,9 @@ This is not a current quote or an approved spend. CPU restoration, temporary
 storage, transfer/requests, retries and cleanup reserve are additional. The old
 $4.50 authorization is not reused.
 
-No RunPod workflow, paid trigger, resource, secret or persistent volume is changed
-in this local preparation. Existing RunPod modes intentionally reject these new
-profiles until a separately reviewed integration handles the nested 18-run
-archive, new summary acceptance, diagnostic review identity and CPU restoration.
-Before GPU approval, present a current-price launch specification with exact new
-commit/image digest, supported GPU/region, inventory, total cap covering all costs,
-deadline/retry policy and independently verifiable cleanup. None are assumed ready
-from an old image or historical inspection.
+The initial training-only preparation did not change RunPod entrypoints.
+The additional local integration and concrete budget/dispatch proposal are in
+[runpod/CLIPPING_RUN.md](../runpod/CLIPPING_RUN.md). Integration is CPU-tested but
+was approved for PR #4 update and a new US$5 total experiment budget, including
+browser dispatch. Image publication and live account preflight remain mandatory;
+no historical budget is reused.

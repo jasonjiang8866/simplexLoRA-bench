@@ -82,9 +82,13 @@ def run(command, log, timeout):
                        timeout=timeout, check=True)
 
 
-def validate_tree(root):
+def validate_tree(root, config_dir=None):
     sys.path.insert(0, "/opt/bench")
-    from simplexbench.cli import summarize
+    from simplexbench.cli import summarize, source_identity
+    clipping = MODE.endswith('-clipping')
+    if clipping:
+        from simplexbench.ablation import summarize_ablation
+        summarize = summarize_ablation
     old_summary = sha(root / "summary.json")
     summary = summarize(root)
     if sha(root / "summary.json") != old_summary:
@@ -92,17 +96,22 @@ def validate_tree(root):
     gate = json.loads((root / "compatibility.json").read_text())
     if gate.get("status") != "passed" or gate.get("bits") != 8 or gate.get("device") != "cuda":
         raise ValueError("Missing real CUDA/int8 gate")
-    manifest = json.loads((root / "manifest.json").read_text())
+    manifest_name = 'ablation.json' if clipping else 'manifest.json'
+    manifest = json.loads((root / manifest_name).read_text())
+    if clipping and manifest['source_hash'] != source_identity():
+        raise ValueError('Clipping archive source mismatch')
     from simplexbench.common import methods_for
     methods = methods_for(manifest["config"])
     for method in methods:
         if any(gate["methods"][method].get(k) is not True for k in ("forward_backward", "frozen_base", "save_reload")):
             raise ValueError("Incomplete compatibility evidence")
-    if {(r["method"], r["seed"]) for r in summary["runs"]} != {
+    if clipping:
+        from runpod.clipping_profile import validate_summary
+        validate_summary(summary, manifest['config'])
+    elif {(r["method"], r["seed"]) for r in summary["runs"]} != {
             (m, s) for m in methods for s in (17, 42, 123)} or len(summary["runs"]) != 3 * len(methods):
         raise ValueError("Incomplete paired matrix")
-    expected = json.loads((Path("/opt/bench/configs") / (MODE + ".json")).read_text())
-    manifest = json.loads((root / "manifest.json").read_text())
+    expected = json.loads((Path(config_dir or "/opt/bench/configs") / (MODE + ".json")).read_text())
     if MODE != "smoke" and (manifest["config"] != expected or manifest["requested_config"] != expected):
         raise ValueError("Unexpected experiment configuration")
     if any(r["steps"] != expected["steps"] for r in summary["runs"]):

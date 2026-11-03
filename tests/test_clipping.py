@@ -136,6 +136,38 @@ def test_full_eighteen_run_pairing_and_tampering(tmp_path, monkeypatch):
     assert summary['measurements']['grouped/simplex-17']['search']['gradient_norms']['importance']['pre']['n'] == 4
     assert summary['measurements']['grouped/simplex-17']['post_search']['gradient_norms']['importance']['pre']['n'] == 0
     assert all(v['time_to_target_delta_seconds']['n'] == 0 for v in summary['paired_deltas'].values())
+    # Exercise the real nested archive reader with synthetic gate metadata.
+    # This is CPU transport coverage, not CUDA evidence.
+    import tarfile
+    from runpod import global_worker as worker
+    gate = {'status': 'passed', 'device': 'cuda', 'bits': 8, 'model_type': 'qwen2',
+            'methods': {m: {k: True for k in ('forward_backward', 'frozen_base', 'save_reload')}
+                        for m in c['methods']}}
+    atomic_json(output / 'compatibility.json', gate)
+    summarize_ablation(output)
+    config_dir = output.parent / 'configs'
+    config_dir.mkdir()
+    atomic_json(config_dir / 'diagnostic-clipping.json', c)
+    monkeypatch.setattr(worker, 'MODE', 'diagnostic-clipping')
+    before = (output / 'summary.json').read_bytes()
+    worker.validate_tree(output, config_dir)
+    archive = output.parent / 'fixture.tar'
+    with tarfile.open(archive, 'w') as tar:
+        for path in sorted(output.rglob('*')):
+            if path.is_file():
+                tar.add(path, arcname=str(path.relative_to(output)), recursive=False)
+    restored = output.parent / 'restored'
+    worker.safe_extract(archive, restored)
+    worker.validate_tree(restored, config_dir)
+    assert (restored / 'summary.json').read_bytes() == before
+    assert {str(p.relative_to(output)): file_hash(p) for p in output.rglob('*') if p.is_file()} == {
+        str(p.relative_to(restored)): file_hash(p) for p in restored.rglob('*') if p.is_file()}
+    (restored / 'grouped/lora-17/steps.jsonl').write_text('corrupt')
+    with pytest.raises((ValueError, KeyError)):
+        worker.validate_tree(restored, config_dir)
+    atomic_json(config_dir / 'diagnostic-clipping.json', {**c, 'steps': 999})
+    with pytest.raises(ValueError, match='configuration'):
+        worker.validate_tree(output, config_dir)
     # Resealed batch/LR/device changes must still fail paired validation.
     path = tmp_path / 'grouped/lora-17'
     for filename, mutate, error in [

@@ -4,7 +4,7 @@ on:
     inputs:
       experiment:
         type: choice
-        options: [legacy, dora]
+        options: [legacy, dora, clipping]
         default: legacy
   push:
     branches: [main]
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Normalize review artifact filename
         env:
-          REVIEW_SOURCE: ${{ inputs.experiment == 'dora' && 'docs/results/dora-diagnosis-review.json' || 'docs/results/diagnosis-review.json' }}
+          REVIEW_SOURCE: ${{ inputs.experiment == 'clipping' && 'docs/results/clipping-diagnosis-review.json' || inputs.experiment == 'dora' && 'docs/results/dora-diagnosis-review.json' || 'docs/results/diagnosis-review.json' }}
         run: |
           mkdir -p review-artifact
           cp "$REVIEW_SOURCE" review-artifact/diagnosis-review.json
