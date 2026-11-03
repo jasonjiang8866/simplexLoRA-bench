@@ -139,6 +139,7 @@ def test_full_eighteen_run_pairing_and_tampering(tmp_path, monkeypatch):
     # Exercise the real nested archive reader with synthetic gate metadata.
     # This is CPU transport coverage, not CUDA evidence.
     import tarfile
+    monkeypatch.syspath_prepend(str(ROOT))
     from runpod import global_worker as worker
     gate = {'status': 'passed', 'device': 'cuda', 'bits': 8, 'model_type': 'qwen2',
             'methods': {m: {k: True for k in ('forward_backward', 'frozen_base', 'save_reload')}
