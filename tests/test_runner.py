@@ -21,7 +21,7 @@ def test_training_loop_with_cpu_fixture(tmp_path, monkeypatch, method):
     run_cpu_fixture(tmp_path, monkeypatch, method)
 
 
-def run_cpu_fixture(tmp_path, monkeypatch, method, seed=17):
+def run_cpu_fixture(tmp_path, monkeypatch, method, seed=17, config_updates=None, manifest_override=None):
     torch.set_num_threads(1)
     torch.manual_seed(seed)
     config = json.loads((Path(__file__).parents[1] / "configs/smoke.json").read_text())
@@ -48,13 +48,18 @@ def run_cpu_fixture(tmp_path, monkeypatch, method, seed=17):
     monkeypatch.setattr(torch.cuda, "max_memory_allocated", lambda: 0)
     monkeypatch.setattr(torch.cuda, "max_memory_reserved", lambda: 0)
     monkeypatch.setattr(torch.cuda, "get_device_name", lambda: "CPU test double")
+    from types import SimpleNamespace
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(uuid="CPU-test-fixture"))
     version = runner.importlib.metadata.version
     monkeypatch.setattr(runner.importlib.metadata, "version",
                         lambda p: "test-double" if p == "bitsandbytes" else version(p))
     config.update(methods=["lora", "simplex", "dora"], evidence_version=2)
+    config.update(config_updates or {})
     from simplexbench.common import execution_order
     manifest = {"config": config, "execution_order": execution_order(config)}
     manifest["id"] = digest(manifest)
+    if manifest_override is not None:
+        manifest = manifest_override
     output = tmp_path / f"{method}-{seed}"
     result = runner.train(config, method, seed, output, manifest["id"])
     assert result["steps"] == 8

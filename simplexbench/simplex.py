@@ -78,7 +78,7 @@ class SimplexController:
         return [] if self.frozen else [self.weights]
 
     @torch.no_grad()
-    def step(self, step):
+    def step(self, step, telemetry=False):
         """Called after AdamW; returns True when A/B parameters were replaced."""
         if self.frozen:
             return False
@@ -86,13 +86,29 @@ class SimplexController:
             raise RuntimeError("Missing/nonfinite importance gradient")
         active = [self.indices[n] for n in self.layers]
         w = self.weights[active]
+        if telemetry:
+            before = w.clone()
+            gradient_delta = -self.weight_lr * self.weights.grad[active]
+            regularizer_delta = -self.weight_lr * self.regularization * (w - 1)
         w -= self.weight_lr * (self.weights.grad[active] + self.regularization * (w - 1))
         self.weights[active] = w
         self.weights.grad = None
+        if telemetry:
+            self.last_update = {
+                "active_names": list(self.layers), "before": before.cpu().tolist(),
+                "after_sgd": w.cpu().tolist(),
+                "gradient_delta_l2": float(gradient_delta.norm()),
+                "regularizer_delta_l2": float(regularizer_delta.norm()),
+                "actual_sgd_delta_l2": float((w - before).norm()),
+                "actual_sgd_delta_abs_max": float((w - before).abs().max()),
+                "projected": None, "projection_delta_l2": None, "reset_to_one": False}
         if step % self.interval:
             return False
         projected = project_simplex(self.weights[active], len(self.names))
         self.weights[active] = projected
+        if telemetry:
+            self.last_update.update(projected=projected.cpu().tolist(),
+                projection_delta_l2=float((projected - w).norm()))
         ranks = paper_ranks(projected, self.rank).tolist()
         self.completed += 1
         final = self.completed == self.updates
@@ -135,6 +151,8 @@ class SimplexController:
                              "weights": projected.cpu().tolist(),
                              "adapter_parameters": count, "budget": self.budget})
         if final:
+            if telemetry:
+                self.last_update["reset_to_one"] = True
             self.weights.fill_(1)
             self.weights.requires_grad_(False)
             self.frozen = True

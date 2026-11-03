@@ -9,6 +9,7 @@ import sys
 import time
 from pathlib import Path
 
+from .clipping import validate_clip_evidence
 from .common import atomic_json, digest, file_hash, validate_config, methods_for, execution_order
 
 METHODS = ("lora", "simplex", "dora")
@@ -49,6 +50,11 @@ def verify_run(directory, manifest, method, seed):
                           ("status", "passed"), ("steps", manifest["config"]["steps"])):
         if result.get(key) != expected:
             raise ValueError(f"Result mismatch: {key}")
+    provenance = json.loads((directory / "provenance.json").read_text())
+    if "clipping_strategy" in manifest["config"] and (provenance.get("config") != manifest["config"] or
+            provenance.get("clipping_strategy") != manifest["config"]["clipping_strategy"] or
+            result.get("clipping_strategy") != manifest["config"]["clipping_strategy"]):
+        raise ValueError("Clipping provenance mismatch")
     rows = [json.loads(line) for line in (directory / "steps.jsonl").read_text().splitlines()]
     if [row["step"] for row in rows] != list(range(1, result["steps"] + 1)):
         raise ValueError("Incomplete/duplicate training steps")
@@ -81,8 +87,7 @@ def verify_run(directory, manifest, method, seed):
             raise ValueError("Missing DoRA update/reload evidence")
         for row in rows:
             g = row["gradients"]
-            if g["missing"] or g["nonfinite"] or g["post_clip"]["norm"] > 1.00001:
-                raise ValueError("Invalid gradient evidence")
+            validate_clip_evidence(g, manifest["config"].get("clipping_strategy", "global"))
             if method == "dora" and (row.get("magnitude") is None or "magnitude" not in g["group_norms"]):
                 raise ValueError("Missing magnitude telemetry")
     from safetensors import safe_open

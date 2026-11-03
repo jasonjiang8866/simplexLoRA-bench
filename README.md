@@ -4,6 +4,11 @@ An isolated **8-bit frozen base + sequence-classification head** benchmark:
 standard LoRA **r=8**, paper-based [SimplexLoRA](https://arxiv.org/abs/2610.37206),
 and PEFT [DoRA](https://arxiv.org/abs/2402.09353), with three paired seeds.
 
+**Gradient-clipping ablation prepared:** [paired experiment design](docs/CLIPPING_ABLATION.md)
+compares fresh global and head/adapter group clipping across all three methods
+and seeds (18 × 500 steps). CPU validation only; no GPU result is claimed.
+This is a separate optimization-policy ablation, not direct paper replication.
+
 **DoRA benchmark complete:** [nine independent 500-step runs](docs/results/dora-benchmark-41399541318.md)
 on one GPU and one immutable image, following the [nine-run 50-step diagnosis](docs/results/dora-diagnosis-41396288500.md).
 Real CUDA/int8 forward/backward, frozen-base/optimizer checks, magnitude/head
