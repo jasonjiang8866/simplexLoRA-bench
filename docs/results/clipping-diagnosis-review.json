@@ -1,0 +1,49 @@
+{
+  "decision": "proceed",
+  "image": "ghcr.io/jasonjiang8866/simplexlora-bench@sha256:6f9bd108b6e39c473660311c618fabb6e254903bd62cb75746afdfc3d66ee60f",
+  "image_source_sha": "2773aac993dd5e7aa639da3979421202f56fd7cc",
+  "source_hash": "c61c6c9721df078032022d68eccedab9ad90beda7f2e3beebdfb13c208e1d91d",
+  "diagnostic_run": 41610971757,
+  "diagnostic_artifact_sha256": "bcffbb1157a37acffe4882c16365d4311788b8e2dd0bc1fd777acc9554fea67e",
+  "diagnostic_archive_sha256": "37e57baf097fc1b905066bb9a000c855ce0ab9e4457088fe17931fbc10082221",
+  "diagnostic_summary_sha256": "3ccf3cda8f73b23498549885b5bff9baf8812baec88fba2292e68f50fce27aed",
+  "methods": [
+    "lora",
+    "simplex",
+    "dora"
+  ],
+  "completed_runs": 18,
+  "diagnostic_steps": 50,
+  "clipping_strategies": [
+    "global",
+    "grouped"
+  ],
+  "diagnostic_config_sha256": "73e6250c731cf329022b1c29de86dad0cf69d11748745627718bbc01c0685fa0",
+  "paired_validation_passed": true,
+  "cross_pod_restore_verified": true,
+  "cleanup_verified": true,
+  "independent_inventory_run": 41621509349,
+  "managed_pods_after": 0,
+  "inventory_checked_utc": "2026-11-03T10:42:44Z",
+  "local_revalidation": "Complete sealed run checks and regenerated summary byte-identical to both GPU writer and CPU reader. Local summarizer is read-only CPU validation of recorded evidence, not another training run.",
+  "authorized_total_experiment_budget_usd": 10,
+  "diagnostic_compute_estimate_usd": 0.3923016563018163,
+  "formal_plan": {
+    "basis": "Observed GPU lifetime plus nine times aggregate 50-step training wall time; holds setup/final-test/export overhead constant. Estimate, not guarantee.",
+    "gpu_seconds_estimate": 6797.567554158159,
+    "cpu_seconds_estimate": 235.28524112701416,
+    "compute_estimate_usd": 1.3067885352324307,
+    "gpu_deadline_minutes": 150,
+    "cpu_deadline_minutes": 15,
+    "max_compute_usd": 1.85,
+    "worst_case_compute_usd": 1.8491666666666664,
+    "payload_limit_bytes": 1073741824
+  },
+  "rationale": "All 18 fresh diagnostic workers and nine policy pairs passed real CUDA/int8, finite clipping, equal initialization/batches/LR, optimizer/rank/checkpoint and cross-region recovery checks. Preserve all training hyperparameters. Do not select policy or tune on diagnostic test F1. Run formal 18 x 500 from zero with the same immutable image/source.",
+  "limitations": [
+    "Only three paired seeds; descriptive comparisons.",
+    "Grouped total norm bound sqrt(2), global bound 1: geometry and total bound both change.",
+    "The 50-step diagnostic is not the final 500-step benchmark.",
+    "Compute cost is elapsed-time estimate, not a final invoice. Persistent Global Volume is retained and may keep accruing storage fees."
+  ]
+}

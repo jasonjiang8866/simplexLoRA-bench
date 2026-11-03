@@ -1,7 +1,7 @@
 # Clipping GPU execution proposal — 2026-11-03 (SGT)
 
 Status: GPU integration and browser Actions dispatch authorized on 2026-11-03;
-US$5 total experiment budget approved. Image/preflight/GPU results pending.
+Initial US$5 budget increased to US$10 total, including incurred costs. Image and 18-run GPU diagnosis passed; see `docs/results/clipping-diagnosis-41610971757.md`.
 Approved training code is PR #4 at `713e5ea034b678c929f49690ff96bf4fe86abac5`.
 This file records the reviewed integration and authorized execution scope.
 
@@ -27,9 +27,9 @@ passed. The CPU nested-archive test uses synthetic gate metadata; it is not CUDA
 verification. It extracts all 18 small fixture runs, regenerates identical
 summary/file hashes, and rejects a corrupted restored steps file and wrong
 expected config. YAML parsed with manual-paid guards checked; `bash -n` and
-`git diff --check` passed. Integration Docker/CUDA validation is still pending.
+`git diff --check` passed. Integration Docker CI and the complete real CUDA/int8 diagnosis have passed.
 
-## Approved total allocation: US$5.00
+## Approved total allocation: US$10.00
 
 One NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb; no other GPU fallback.
 The official public price inspected on 2026-11-03 is $0.69/hour:
@@ -44,19 +44,19 @@ read-only preflight, and must remain within this ceiling before creation.
 | Total | 9,900 steps | 195 minutes | 30 minutes | $2.490834 | $2.50 |
 
 Each phase includes an additional five-minute cleanup allowance for each GPU/CPU
-Pod; CPU rate ceiling is $0.20/hour. The $2.50 unallocated remainder covers this
+Pod; CPU rate ceiling is $0.20/hour. The $7.50 unallocated remainder covers this
 experiment's temporary disk, incremental volume/request/transfer charges,
-applicable tax and any separately reconciled recovery within the same $5 total.
+applicable tax and any separately reconciled recovery within the same $10 total.
 Do not automatically rerun a GPU matrix. Compute cap inputs do NOT include storage
 and do not implement an account-wide total cap: track aggregate actual/estimated
-cost against $5 before each dispatch. A runner/provider outage can delay cleanup;
+cost against $10 before each dispatch. A runner/provider outage can delay cleanup;
 the deadline is not a provider-guaranteed billing cutoff.
 
 Container disk is publicly listed at $0.10/GB/month, with no Pod ingress/egress
 fees: https://docs.runpod.io/pods/pricing . Forty GB on GPU and ten GB on CPU
 would cost about $0.02 over these deadlines (30-day-month estimate). Global Volume
 incremental pricing/request fees were not confirmed in this session; verify them
-before allocating, reserve them from $2.50, and do not equate global storage with
+before allocating, reserve them from $7.50, and do not equate global storage with
 regional network-volume pricing. Preserve the existing volume and historical
 results. Retained storage can continue accruing after compute is deleted; disclose
 that ongoing cost separately in the final result. Existing unrelated storage
@@ -82,7 +82,7 @@ stop at the measured diagnosis and revise the proposal before further compute.
 4. Inspect plan/catalog/owned Pods and exact existing Global Volume
    `cmvwmviz9000007jteci4ajn8`, account headroom and prices. Do not create/resize a
    volume or reuse an occupied run identity. Unknown inventory blocks launch.
-5. Only after an explicit new $5 budget authorization and passing preflight,
+5. After the current $10 total authorization (including prior costs) and passing preflight,
    dispatch the same inputs with paid confirmation true. Capture run ID/URL once.
 6. Retrieve and independently verify diagnosis; measure timing, archive size and
    full-run cost. Create a factual `docs/results/clipping-diagnosis-review.json`
